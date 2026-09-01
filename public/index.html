@@ -257,10 +257,7 @@
       <div class="brand">BetOn 🏗️</div>
       <div class="who" id="who"></div>
     </div>
-    <div class="row" style="gap:6px">
-      <a class="btn ghost sm" id="adminLink" href="/admin.html" hidden>ניהול ⚙️</a>
-      <button class="btn ghost sm" id="logoutBtn" type="button">↩ התנתקות</button>
-    </div>
+    <button class="btn ghost sm" id="logoutBtn" type="button">↩ התנתקות</button>
   </header>
   <main id="view"></main>
   <nav class="tabs" id="tabs" hidden></nav>
@@ -530,7 +527,6 @@ async function renderBoard() {
 // ---------------- boot ----------------
 function boot() {
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
-  $('#adminLink').hidden = !state.user.is_admin;
   $('#logoutBtn').hidden = false;
   route();
 }
