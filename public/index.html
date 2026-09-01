@@ -454,11 +454,12 @@ async function renderBets() {
       el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
     ));
 
+    const showResults = !isToday; // today: show only the chosen bet, never results
     const box = el('div', { className: 'answers' });
     for (const a of q.answers) {
       const picked = q.my_answer_id === a.id;
-      const isCorrect = q.status === 'resolved' && q.correct_answer_id === a.id;
-      const wrongPick = q.status === 'resolved' && picked && !isCorrect;
+      const isCorrect = showResults && q.status === 'resolved' && q.correct_answer_id === a.id;
+      const wrongPick = showResults && q.status === 'resolved' && picked && !isCorrect;
       const btn = el('button', {
         className: 'answer' + (picked ? ' picked' : '') + (isCorrect ? ' correct' : '') + (wrongPick ? ' wrongpick' : ''),
         disabled: q.status !== 'open' || !isToday,
@@ -480,12 +481,14 @@ async function renderBets() {
     }
     card.append(box);
 
-    if (q.status === 'resolved' && q.my_answer_id != null) {
+    if (showResults && q.status === 'resolved' && q.my_answer_id != null) {
       const hit = q.my_answer_id === q.correct_answer_id;
       const gained = hit ? q.answers.find((a) => a.id === q.correct_answer_id)?.value ?? 0 : 0;
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' },
         hit ? `פגעת! ${fmt(gained)} נקודות` : 'החמצת בשאלה הזו'));
-    } else if (q.status !== 'open' && q.my_answer_id == null) {
+    } else if (q.my_answer_id != null) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור שלך נשמר ✓'));
+    } else if (q.status !== 'open' || !isToday) {
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על השאלה הזו'));
     }
     view.append(card);

@@ -295,6 +295,7 @@ async function renderEvents(root) {
       const mark = el('button', {
         className: 'btn sm' + (q.correct_answer_id === a.id ? ' primary' : ' ghost'),
         type: 'button',
+        disabled: !isPast,
         onclick: async () => {
           try { await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } }); renderEvents(root); }
           catch (e) { toast(e.message, true); }
@@ -332,6 +333,7 @@ async function renderEvents(root) {
     for (const s of ['open', 'closed', 'resolved']) {
       const o = el('option', { value: s }, { open: 'פתוח', closed: 'סגור להימורים', resolved: 'הוכרע' }[s]);
       if (s === q.status) o.selected = true;
+      if (s === 'resolved' && !isPast && q.status !== 'resolved') o.disabled = true;
       statusSel.append(o);
     }
     statusSel.onchange = async () => {
@@ -351,6 +353,9 @@ async function renderEvents(root) {
     ));
     if (q.status === 'resolved' && !q.correct_answer_id) {
       card.append(el('div', { style: 'color:var(--bad);margin-top:6px', className: 'muted' }, '⚠ סמן תשובה נכונה כדי לחשב ניקוד'));
+    }
+    if (!isPast) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:6px' }, '⏳ ניתן להגדיר תוצאה רק החל מהיום שאחרי האירוע'));
     }
     root.append(card);
   }

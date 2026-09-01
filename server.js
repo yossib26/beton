@@ -287,6 +287,17 @@ app.patch('/api/admin/questions/:id', requireAdmin, wrap(async (req, res) => {
   if (status && !['open', 'closed', 'resolved'].includes(status)) {
     return res.status(400).json({ error: 'סטטוס לא חוקי' });
   }
+
+  const cur = await pool.query(
+    'SELECT (event_date < CURRENT_DATE) AS is_past FROM questions WHERE id = $1',
+    [id]
+  );
+  if (!cur.rows.length) return res.status(404).json({ error: 'שאלה לא נמצאה' });
+  const settingResult = status === 'resolved' || correct_answer_id != null;
+  if (settingResult && !cur.rows[0].is_past) {
+    return res.status(400).json({ error: 'ניתן להגדיר תוצאה רק לאירוע מיום שעבר' });
+  }
+
   if (correct_answer_id != null) {
     const ok = await pool.query('SELECT 1 FROM answers WHERE id = $1 AND question_id = $2', [
       correct_answer_id, id,
