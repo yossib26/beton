@@ -98,7 +98,8 @@
     font: inherit;
   }
   input::placeholder { color: var(--muted); }
-  label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+  label { display: block; font-size: .8rem; color: var(--muted); margin: 8px 0 3px; }
+  label:first-child { margin-top: 0; }
 
   button.btn {
     padding: 11px 14px;
@@ -200,12 +201,12 @@
   /* screen that pins the login card to the bottom */
   .auth-screen {
     min-height: calc(100vh - 128px);
-    display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
   }
   /* comic strip of every user in the system, top of the login page */
   .faces {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
-    gap: 16px 20px; padding: 34px 8px 8px; min-height: 40px;
+    gap: 14px 18px; padding: 16px 8px 4px; min-height: 40px;
   }
   .face-chip {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -326,15 +327,14 @@ function renderAuth() {
   renderLoginFaces(faces);
 
   view.append(el('div', { className: 'auth-screen' },
+    faces,
     el('div', {},
-      faces,
-      el('div', { className: 'center', style: 'font-size:2.2rem;padding:4px 0 2px' }, '🏗️'),
-      el('h2', { style: 'text-align:center;margin:0;font-size:1.8rem' }, 'BetOn'),
-    ),
-    el('div', { className: 'card', style: 'margin-bottom:0' },
-      el('label', {}, 'שם משתמש'), userI,
-      el('label', {}, 'סיסמה'), passI,
-      el('div', { className: 'row', style: 'margin-top:16px' }, submit),
+      el('h2', { style: 'text-align:center;margin:0 0 10px;font-size:2rem' }, '🏗️ BetOn'),
+      el('div', { className: 'card', style: 'margin-bottom:0' },
+        el('label', {}, 'שם משתמש'), userI,
+        el('label', {}, 'סיסמה'), passI,
+        el('div', { className: 'row', style: 'margin-top:14px' }, submit),
+      ),
     ),
   ));
 }
