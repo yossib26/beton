@@ -261,17 +261,38 @@ function renderAuth() {
   view.innerHTML = '';
   let mode = 'login';
 
+  const DEFAULT_USER = { username: 'yossi', password: 'beton123' };
+  const DEMO_USERS = [
+    { username: 'yossi', password: 'beton123', label: 'yossi · מנהל' },
+    { username: 'dana', password: 'beton123', label: 'dana' },
+    { username: 'avi', password: 'beton123', label: 'avi' },
+  ];
+
   const nameI = el('input', { placeholder: 'שם מלא' });
-  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', autocorrect: 'off' });
-  const passI = el('input', { placeholder: 'סיסמה', type: 'password' });
+  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', autocorrect: 'off', value: DEFAULT_USER.username });
+  const passI = el('input', { placeholder: 'סיסמה', type: 'password', value: DEFAULT_USER.password });
   const nameWrap = el('div', {}, el('label', {}, 'שם'), nameI);
   const submit = el('button', { className: 'btn primary grow' });
   const toggle = el('button', { className: 'btn ghost grow' });
+
+  const fill = (u) => { userI.value = u.username; passI.value = u.password; };
+  const demoWrap = el('div', { style: 'margin-top:12px' },
+    el('label', {}, 'משתמשי ברירת מחדל'),
+    el('div', { className: 'row', style: 'flex-wrap:wrap;gap:6px' },
+      ...DEMO_USERS.map((u) =>
+        el('button', {
+          className: 'btn ghost sm',
+          onclick: () => { fill(u); toast('מולא: ' + u.username); },
+        }, u.label)),
+    ),
+  );
 
   const paint = () => {
     submit.textContent = mode === 'login' ? 'כניסה' : 'הרשמה';
     toggle.textContent = mode === 'login' ? 'אין לי חשבון' : 'יש לי חשבון';
     nameWrap.hidden = mode === 'login';
+    demoWrap.hidden = mode !== 'login';
+    if (mode === 'login' && !userI.value) fill(DEFAULT_USER);
   };
   paint();
 
@@ -296,6 +317,7 @@ function renderAuth() {
       el('label', {}, 'סיסמה'), passI,
       el('div', { className: 'row', style: 'margin-top:16px' }, submit),
       el('div', { className: 'row', style: 'margin-top:8px' }, toggle),
+      demoWrap,
     ),
   );
 }
