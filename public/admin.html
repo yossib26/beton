@@ -213,10 +213,15 @@ function dateBar(onChange) {
   };
   const picker = el('input', { type: 'date', value: state.date, style: 'width:auto' });
   picker.onchange = () => { state.date = picker.value; onChange(); };
+  const isToday = state.date === todayISO();
   return el('div', { className: 'datebar' },
     el('button', { className: 'btn sm', type: 'button', onclick: () => shift(-1) }, '‹ יום קודם'),
+    el('button', {
+      className: 'btn sm' + (isToday ? ' primary' : ''), type: 'button',
+      disabled: isToday, onclick: () => { state.date = todayISO(); onChange(); },
+    }, 'היום'),
     picker,
-    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(1) }, 'יום הבא ›'),
+    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(1) }, 'מחר ›'),
   );
 }
 

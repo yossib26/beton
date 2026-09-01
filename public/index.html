@@ -401,27 +401,22 @@ async function renderLoginFaces(container) {
   });
 }
 
-function dateBar(onChange, { maxDate } = {}) {
-  if (maxDate && state.date > maxDate) state.date = maxDate;
+function dateBar(onChange) {
   const shift = (days) => {
     const d = new Date(state.date + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    const next = d.toLocaleDateString('sv-SE');
-    if (maxDate && next > maxDate) return;
-    state.date = next;
+    state.date = d.toLocaleDateString('sv-SE');
     onChange();
   };
-  const picker = el('input', { type: 'date', value: state.date, style: 'width:auto' });
-  if (maxDate) picker.max = maxDate;
-  picker.onchange = () => {
-    state.date = maxDate && picker.value > maxDate ? maxDate : picker.value;
-    onChange();
-  };
-  const atMax = maxDate && state.date >= maxDate;
+  const today = todayISO();
+  const isToday = state.date === today;
   return el('div', { className: 'datebar' },
-    el('button', { className: 'btn sm', onclick: () => shift(-1) }, '‹ אתמול'),
-    picker,
-    el('button', { className: 'btn sm', disabled: atMax, onclick: () => shift(1) }, 'מחר ›'),
+    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(-1) }, '‹ יום קודם'),
+    el('button', {
+      className: 'btn sm' + (isToday ? ' primary' : ''), type: 'button',
+      disabled: isToday, onclick: () => { state.date = today; onChange(); },
+    }, 'היום'),
+    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(1) }, 'מחר ›'),
   );
 }
 
@@ -430,7 +425,7 @@ async function renderBets() {
   $('#hdr').hidden = false;
   const view = $('#view');
   view.innerHTML = '';
-  view.append(el('h2', {}, 'אירועי היום'), dateBar(renderBets, { maxDate: todayISO() }), el('div', { className: 'center' }, 'טוען…'));
+  view.append(el('h2', {}, 'אירועי היום'), dateBar(renderBets), el('div', { className: 'center' }, 'טוען…'));
   let questions;
   try {
     questions = await api('/api/questions?date=' + state.date);
@@ -439,7 +434,7 @@ async function renderBets() {
   const isToday = state.date === todayISO();
 
   view.innerHTML = '';
-  view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets, { maxDate: todayISO() }));
+  view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets));
   if (!isToday) {
     view.append(el('div', { className: 'card muted' }, '👁️ צפייה בלבד — ניתן להמר רק על אירועי היום.'));
   }
