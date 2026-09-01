@@ -64,28 +64,7 @@ const wrap = (fn) => (req, res) =>
   });
 
 // --- auth -----------------------------------------------------------------
-app.post('/api/auth/register', wrap(async (req, res) => {
-  const name = (req.body?.name || '').trim();
-  const username = (req.body?.username || '').trim();
-  const password = req.body?.password || '';
-  if (!name || !username || !password) {
-    return res.status(400).json({ error: 'שם, שם משתמש וסיסמה נדרשים' });
-  }
-  if (password.length < 4) {
-    return res.status(400).json({ error: 'סיסמה קצרה מדי (לפחות 4 תווים)' });
-  }
-  const taken = await pool.query('SELECT 1 FROM users WHERE lower(username) = lower($1)', [username]);
-  if (taken.rows.length) return res.status(409).json({ error: 'שם המשתמש תפוס' });
-
-  const { rows } = await pool.query(
-    `INSERT INTO users (name, username, password_hash) VALUES ($1, $2, $3)
-     RETURNING id, name, username, is_admin`,
-    [name, username, hashPassword(password)]
-  );
-  setSession(res, rows[0].id);
-  res.status(201).json(rows[0]);
-}));
-
+// no self-registration: accounts are created in the admin console only
 app.post('/api/auth/login', wrap(async (req, res) => {
   const username = (req.body?.username || '').trim();
   const password = req.body?.password || '';

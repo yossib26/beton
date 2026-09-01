@@ -1,4 +1,4 @@
-# בטון · אפליקציית הימורי אירועים (מובייל)
+# BetOn · אפליקציית הימורי אירועים (מובייל)
 
 אתר מובייל להימור על אירועי היום. אדמין מזין שאלות (אירועים) עם מספר תשובות שלכל אחת ערך;
 כל מהמר נכנס עם משתמש/סיסמה ובוחר תשובה לכל שאלה. התוצאה הסופית = סכום הערכים של
@@ -47,14 +47,16 @@ npm run db:seed-demo-past   # 2 שאלות/יום, 10 ימים אחורה, מו�
 
 | Method | Path | תיאור |
 |---|---|---|
-| POST | `/api/auth/register` | הרשמה `{name, username, password}` |
-| POST | `/api/auth/login` | כניסה `{username, password}` |
+| POST | `/api/auth/login` | כניסה `{username, password}` (אין הרשמה עצמית — חשבונות נוצרים בקונסולה) |
 | POST | `/api/auth/logout` | יציאה |
 | GET | `/api/auth/me` | המשתמש הנוכחי |
 | GET | `/api/questions?date=YYYY-MM-DD` | שאלות היום + התשובה שלי |
-| POST | `/api/bets` | `{question_id, answer_id}` (רק כששאלה `open`) |
+| POST | `/api/bets` | `{question_id, answer_id}` (רק אירוע של היום ו-`open`) |
+| GET | `/api/users` | רשימת המהמרים + ניקוד (ציבורי, למסך הכניסה) |
 | GET | `/api/leaderboard` | טבלת דירוג |
 | GET/POST | `/api/admin/questions` | ניהול שאלות (מנהל) |
 | PATCH/DELETE | `/api/admin/questions/:id` | סטטוס / תשובה נכונה / מחיקה |
 | POST | `/api/admin/questions/:id/answers` | הוספת תשובה |
 | PATCH/DELETE | `/api/admin/answers/:id` | עריכת ערך / מחיקה |
+| GET/POST | `/api/admin/users` | רשימה / יצירת משתמש (`is_admin` לתפקיד) |
+| PATCH/DELETE | `/api/admin/users/:id` | שם / סיסמה / `icon` / תפקיד / מחיקה |

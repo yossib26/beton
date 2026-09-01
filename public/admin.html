@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>בטון · קונסולת ניהול</title>
+<title>BetOn · קונסולת ניהול</title>
 <style>
   :root {
     --bg: #0f172a; --surface: #1e293b; --surface-2: #334155; --line: #475569;
@@ -95,7 +95,7 @@
 <body>
 <header id="hdr" hidden>
   <div>
-    <div class="brand">בטון · ניהול ⚙️</div>
+    <div class="brand">BetOn · ניהול ⚙️</div>
     <div class="who" id="who"></div>
   </div>
   <div class="row">
@@ -146,6 +146,7 @@ const ADMIN_DEFAULT = { username: 'yossi', password: 'beton123' };
 
 function renderGate(msg) {
   $('#hdr').hidden = true;
+  $('#logoutBtn').hidden = true;
   const m = $('#main');
   m.innerHTML = '';
   const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', value: ADMIN_DEFAULT.username });
@@ -174,6 +175,7 @@ function renderGate(msg) {
 // ---------------- shell ----------------
 function boot() {
   $('#hdr').hidden = false;
+  $('#logoutBtn').hidden = false;
   $('#who').textContent = state.user.name + ' · מנהל';
   render();
 }

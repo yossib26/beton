@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>בטון · הימורים</title>
+<title>BetOn · הימורים</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -197,10 +197,15 @@
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
+  /* screen that pins the login card to the bottom */
+  .auth-screen {
+    min-height: calc(100vh - 128px);
+    display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
+  }
   /* comic strip of every user in the system, top of the login page */
   .faces {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
-    gap: 10px 14px; padding: 30px 8px 6px; min-height: 40px;
+    gap: 16px 20px; padding: 34px 8px 8px; min-height: 40px;
   }
   .face-chip {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -248,7 +253,7 @@
 <div id="app">
   <header id="hdr" hidden>
     <div>
-      <div class="brand">בטון 🏗️</div>
+      <div class="brand">BetOn 🏗️</div>
       <div class="who" id="who"></div>
     </div>
     <div class="row" style="gap:6px">
@@ -296,73 +301,42 @@ const state = { user: null, tab: 'bets', date: todayISO() };
 function renderAuth() {
   $('#hdr').hidden = true;
   $('#tabs').hidden = true;
+  $('#logoutBtn').hidden = true;
   const view = $('#view');
   view.innerHTML = '';
-  let mode = 'login';
 
   const DEFAULT_USER = { username: 'yossi', password: 'beton123' };
-  const DEMO_USERS = [
-    { username: 'yossi', password: 'beton123', label: 'yossi · מנהל' },
-    { username: 'dana', password: 'beton123', label: 'dana' },
-    { username: 'avi', password: 'beton123', label: 'avi' },
-  ];
 
-  const nameI = el('input', { placeholder: 'שם מלא' });
   const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', autocorrect: 'off', value: DEFAULT_USER.username });
   const passI = el('input', { placeholder: 'סיסמה', type: 'password', value: DEFAULT_USER.password });
-  const nameWrap = el('div', {}, el('label', {}, 'שם'), nameI);
-  const submit = el('button', { className: 'btn primary grow' });
-  const toggle = el('button', { className: 'btn ghost grow' });
+  const submit = el('button', { className: 'btn primary grow' }, 'כניסה');
 
-  const fill = (u) => { userI.value = u.username; passI.value = u.password; };
-  const demoWrap = el('div', { style: 'margin-top:12px' },
-    el('label', {}, 'משתמשי ברירת מחדל'),
-    el('div', { className: 'row', style: 'flex-wrap:wrap;gap:6px' },
-      ...DEMO_USERS.map((u) =>
-        el('button', {
-          className: 'btn ghost sm',
-          onclick: () => { fill(u); toast('מולא: ' + u.username); },
-        }, u.label)),
-    ),
-  );
-
-  const paint = () => {
-    submit.textContent = mode === 'login' ? 'כניסה' : 'הרשמה';
-    toggle.textContent = mode === 'login' ? 'אין לי חשבון' : 'יש לי חשבון';
-    nameWrap.hidden = mode === 'login';
-    demoWrap.hidden = mode !== 'login';
-    if (mode === 'login' && !userI.value) fill(DEFAULT_USER);
-  };
-  paint();
-
-  toggle.onclick = () => { mode = mode === 'login' ? 'register' : 'login'; paint(); };
   submit.onclick = async () => {
     try {
-      const body = { username: userI.value.trim(), password: passI.value };
-      if (mode === 'register') body.name = nameI.value.trim();
-      const path = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      state.user = await api(path, { method: 'POST', body });
+      state.user = await api('/api/auth/login', {
+        method: 'POST',
+        body: { username: userI.value.trim(), password: passI.value },
+      });
       boot();
     } catch (e) { toast(e.message, true); }
   };
+  passI.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit.click(); });
 
   const faces = el('div', { className: 'faces' });
   renderLoginFaces(faces);
 
-  view.append(
-    faces,
-    el('div', { className: 'center', style: 'font-size:2.6rem;padding-bottom:8px' }, '🏗️'),
-    el('h2', { style: 'text-align:center' }, 'בטון · הימורי אירועים'),
-    el('p', { className: 'muted', style: 'text-align:center;margin-top:-4px' }, 'התחבר כדי להמר על אירועי היום'),
-    el('div', { className: 'card' },
-      nameWrap,
+  view.append(el('div', { className: 'auth-screen' },
+    el('div', {},
+      faces,
+      el('div', { className: 'center', style: 'font-size:2.2rem;padding:4px 0 2px' }, '🏗️'),
+      el('h2', { style: 'text-align:center;margin:0;font-size:1.8rem' }, 'BetOn'),
+    ),
+    el('div', { className: 'card', style: 'margin-bottom:0' },
       el('label', {}, 'שם משתמש'), userI,
       el('label', {}, 'סיסמה'), passI,
       el('div', { className: 'row', style: 'margin-top:16px' }, submit),
-      el('div', { className: 'row', style: 'margin-top:8px' }, toggle),
-      demoWrap,
     ),
-  );
+  ));
 }
 
 // ---------------- Tabs / shell ----------------
@@ -407,7 +381,7 @@ async function renderLoginFaces(container) {
   shuffled.forEach((u) => {
     const rank = rankById.get(u.id);
     const t = n > 1 ? rank / (n - 1) : 0;           // 0 = leader … 1 = last
-    const size = (3.1 - t * 1.9).toFixed(2);        // rem: 3.1 → 1.2
+    const size = (4.8 - t * 2.4).toFixed(2);        // rem: 4.8 → 2.4
     const isLeader = rank === 0;
     const dur = (3 + seeded(u.id * 5 + 4) * 3).toFixed(2);
     const delay = (seeded(u.id * 11 + 6) * -6).toFixed(2);
@@ -556,6 +530,7 @@ async function renderBoard() {
 function boot() {
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
   $('#adminLink').hidden = !state.user.is_admin;
+  $('#logoutBtn').hidden = false;
   route();
 }
 async function logout() {
