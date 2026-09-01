@@ -179,8 +179,8 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   res.json(saved.rows[0]);
 }));
 
-// --- roster (any signed-in user) ------------------------------------
-app.get('/api/users', requireAuth, wrap(async (_req, res) => {
+// --- roster (public: names shown on the login page) ----------------
+app.get('/api/users', wrap(async (_req, res) => {
   const { rows } = await pool.query(
     'SELECT id, name, is_admin FROM users ORDER BY id'
   );
