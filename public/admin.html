@@ -224,6 +224,13 @@ async function renderEvents(root) {
   root.innerHTML = '';
   root.append(el('h2', {}, 'אירועי ' + heDate(state.date)), dateBar(() => renderEvents(root)));
 
+  const isPast = state.date < todayISO();
+  if (isPast) {
+    root.append(el('div', { className: 'card muted' },
+      '📅 יום שעבר — אפשר להכריע ולערוך אירועים קיימים, אך לא להוסיף אירוע חדש. ' +
+      'הוספת אירוע אפשרית להיום או לימים קדימה בלבד.'));
+  }
+
   // create form
   const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
   const ansWrap = el('div', {});
@@ -247,14 +254,16 @@ async function renderEvents(root) {
       renderEvents(root);
     } catch (e) { toast(e.message, true); }
   };
-  root.append(el('div', { className: 'card' },
-    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ אירוע חדש'),
-    qText,
-    el('label', {}, 'תשובות וערכים'), ansWrap,
-    el('div', { className: 'row', style: 'margin:6px 0 12px' },
-      el('button', { className: 'btn ghost sm', type: 'button', onclick: () => addRow() }, '+ תשובה')),
-    el('div', { className: 'row' }, createBtn),
-  ));
+  if (!isPast) {
+    root.append(el('div', { className: 'card' },
+      el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ אירוע חדש'),
+      qText,
+      el('label', {}, 'תשובות וערכים'), ansWrap,
+      el('div', { className: 'row', style: 'margin:6px 0 12px' },
+        el('button', { className: 'btn ghost sm', type: 'button', onclick: () => addRow() }, '+ תשובה')),
+      el('div', { className: 'row' }, createBtn),
+    ));
+  }
 
   if (!questions.length) { root.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה')); return; }
 

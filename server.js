@@ -238,6 +238,14 @@ app.post('/api/admin/questions', requireAdmin, wrap(async (req, res) => {
     .filter((a) => a.text);
   if (clean.length < 2) return res.status(400).json({ error: 'נדרשות לפחות 2 תשובות' });
 
+  const dateChk = await pool.query(
+    'SELECT COALESCE($1::date, CURRENT_DATE) < CURRENT_DATE AS is_past',
+    [eventDate]
+  );
+  if (dateChk.rows[0].is_past) {
+    return res.status(400).json({ error: 'אפשר להוסיף אירוע רק להיום או לימים קדימה' });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
