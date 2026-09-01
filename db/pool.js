@@ -5,10 +5,14 @@ import pg from 'pg';
 pg.types.setTypeParser(1082, (v) => v);
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set. Copy .env.example to .env and fill it in.');
+  throw new Error('DATABASE_URL is not set. Locally: copy .env.example to .env. On Vercel: add it in Project Settings → Environment Variables.');
 }
 
-export const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+// Reuse one pool across warm serverless invocations.
+export const pool =
+  globalThis.__betonPool ??
+  (globalThis.__betonPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: process.env.VERCEL ? 1 : 10,
+  }));

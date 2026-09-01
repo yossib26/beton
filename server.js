@@ -421,8 +421,13 @@ app.delete('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
   res.json({ deleted: r.rowCount });
 }));
 
-// --- static -----------------------------------------------------------
+// --- static (local dev only; on Vercel public/ is served as static assets) --
 app.use(express.static('public'));
 
-const port = process.env.PORT || 8000;
-app.listen(port, () => console.log(`listening on http://127.0.0.1:${port}`));
+// On Vercel the app is imported by api/index.js as a serverless handler.
+if (!process.env.VERCEL) {
+  const port = process.env.PORT || 8000;
+  app.listen(port, () => console.log(`listening on http://127.0.0.1:${port}`));
+}
+
+export default app;

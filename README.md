@@ -30,6 +30,18 @@ npm run db:seed-demo        # 3 שאלות/יום, 10 ימים קדימה, פת�
 npm run db:seed-demo-past   # 2 שאלות/יום, 10 ימים אחורה, מוכרעות + ~30 הימורי דמו למהמרים
 ```
 
+## פריסה ב-Vercel
+
+`server.js` מייצא את אפליקציית Express; `api/index.js` הוא ה-serverless entry
+ו-`vercel.json` מנתב `/api/*` אליו. הקבצים ב-`public/` מוגשים כ-static ע"י Vercel.
+
+1. **Project Settings → Environment Variables** (Production + Preview):
+   - `DATABASE_URL` – מחרוזת ה-connection של Neon (עם `-pooler`)
+   - `SESSION_SECRET` – מחרוזת אקראית ארוכה
+2. Redeploy.
+3. הטבלאות והמשתמשים נוצרים פעם אחת מול Neon: `npm run db:init` מקומית עם אותו
+   `DATABASE_URL` (ואופציונלית `npm run db:seed-demo*`).
+
 ## מודל הנתונים
 
 - **users** – `is_admin=false` מהמרים, `is_admin=true` חשבונות ניהול (לא משתתפים בהימורים
