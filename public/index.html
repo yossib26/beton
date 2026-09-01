@@ -458,14 +458,16 @@ async function renderBets() {
     return;
   }
 
-  for (const q of questions) {
+  const showResults = !isToday; // today: show only the chosen bet, never results
+
+  // one question card; picking a bet updates local state and swaps this card only
+  const buildCard = (q) => {
     const card = el('div', { className: 'card' });
     card.append(el('div', { className: 'row' },
       el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
       el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
     ));
 
-    const showResults = !isToday; // today: show only the chosen bet, never results
     const box = el('div', { className: 'answers' });
     for (const a of q.answers) {
       const picked = q.my_answer_id === a.id;
@@ -480,12 +482,18 @@ async function renderBets() {
       );
       if (q.status === 'open' && isToday) {
         btn.onclick = async () => {
+          const prev = q.my_answer_id;
+          if (prev === a.id) return;
+          q.my_answer_id = a.id;              // optimistic
+          card.replaceWith(buildCard(q));
           try {
             await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
-            q.my_answer_id = a.id;
-            renderBets();
             toast('ההימור נשמר');
-          } catch (e) { toast(e.message, true); }
+          } catch (e) {
+            q.my_answer_id = prev;            // revert
+            toast(e.message, true);
+            renderBets();
+          }
         };
       }
       box.append(btn);
@@ -502,8 +510,10 @@ async function renderBets() {
     } else if (q.status !== 'open' || !isToday) {
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על השאלה הזו'));
     }
-    view.append(card);
-  }
+    return card;
+  };
+
+  for (const q of questions) view.append(buildCard(q));
   view.append(logoutFooter());
 }
 

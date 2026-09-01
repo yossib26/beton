@@ -247,25 +247,31 @@ async function renderEvents(root) {
       'הוספת אירוע אפשרית להיום או לימים קדימה בלבד.'));
   }
 
-  // live standings — recomputed from every resolved event on each load
-  const standCard = el('div', { className: 'card' });
-  standCard.append(el('div', { className: 'row', style: 'font-weight:700;margin-bottom:6px' },
-    el('div', { className: 'grow' }, '🏆 דירוג מעודכן'),
-    el('button', { className: 'btn ghost sm', type: 'button', onclick: () => renderEvents(root) }, '⟳ חשב מחדש'),
-  ));
-  if (!standings.length) {
-    standCard.append(el('div', { className: 'muted' }, 'אין נתונים עדיין'));
-  } else {
+  // live standings — recomputed from every resolved event; refreshed in place
+  const standBody = el('div', {});
+  const paintStandings = () => {
+    standBody.innerHTML = '';
+    if (!standings.length) { standBody.append(el('div', { className: 'muted' }, 'אין נתונים עדיין')); return; }
     standings.forEach((r, i) => {
-      standCard.append(el('div', { className: 'row', style: 'padding:5px 0;border-top:1px solid var(--line)' },
+      standBody.append(el('div', { className: 'row', style: 'padding:5px 0;border-top:1px solid var(--line)' },
         el('div', { className: 'muted', style: 'width:20px' }, String(i + 1)),
         el('div', { className: 'grow' }, r.name),
         el('div', { className: 'muted', style: 'font-size:.8rem' }, `${r.hits} פגיעות`),
         el('div', { style: 'font-weight:800;font-variant-numeric:tabular-nums;width:52px;text-align:left' }, fmt(r.score)),
       ));
     });
-  }
-  root.append(standCard);
+  };
+  paintStandings();
+  const refreshStandings = async () => {
+    try { standings = await api('/api/leaderboard'); paintStandings(); } catch { /* keep last */ }
+  };
+  root.append(el('div', { className: 'card' },
+    el('div', { className: 'row', style: 'font-weight:700;margin-bottom:6px' },
+      el('div', { className: 'grow' }, '🏆 דירוג מעודכן'),
+      el('button', { className: 'btn ghost sm', type: 'button', onclick: refreshStandings }, '⟳ חשב מחדש'),
+    ),
+    standBody,
+  ));
 
   // create form
   const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
@@ -303,8 +309,12 @@ async function renderEvents(root) {
 
   if (!questions.length) { root.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה')); return; }
 
-  for (const q of questions) {
+  // Build one question card. Result-affecting edits update local state,
+  // swap just this card, and refresh the standings — no full re-render.
+  const buildCard = (q) => {
     const card = el('div', { className: 'card' });
+    const swap = () => card.replaceWith(buildCard(q));
+
     card.append(el('div', { className: 'row' },
       el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
       el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
@@ -313,10 +323,13 @@ async function renderEvents(root) {
     for (const a of q.answers) {
       const num = el('input', { className: 'num', type: 'number', step: 'any', value: a.value });
       num.onchange = async () => {
+        const v = parseFloat(num.value) || 0;
         try {
-          await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } });
+          await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: v } });
+          a.value = v;
           toast('ערך עודכן — הניקוד חושב מחדש');
-          renderEvents(root);
+          swap();
+          refreshStandings();
         } catch (e) { toast(e.message, true); }
       };
       const mark = el('button', {
@@ -326,8 +339,10 @@ async function renderEvents(root) {
         onclick: async () => {
           try {
             await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } });
+            q.correct_answer_id = a.id;
             toast('✓ התשובה עודכנה — הניקוד חושב מחדש');
-            renderEvents(root);
+            swap();
+            refreshStandings();
           } catch (e) { toast(e.message, true); }
         },
       }, q.correct_answer_id === a.id ? '✔ נכונה' : 'סמן נכונה');
@@ -367,10 +382,13 @@ async function renderEvents(root) {
       statusSel.append(o);
     }
     statusSel.onchange = async () => {
+      const v = statusSel.value;
       try {
-        await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } });
-        toast(statusSel.value === 'resolved' ? 'הוכרע — הניקוד חושב מחדש' : 'סטטוס עודכן');
-        renderEvents(root);
+        await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: v } });
+        q.status = v;
+        toast(v === 'resolved' ? 'הוכרע — הניקוד חושב מחדש' : 'סטטוס עודכן');
+        swap();
+        refreshStandings();
       } catch (e) { toast(e.message, true); statusSel.value = q.status; }
     };
     card.append(el('div', { className: 'row' },
@@ -390,8 +408,10 @@ async function renderEvents(root) {
     if (!isPast) {
       card.append(el('div', { className: 'muted', style: 'margin-top:6px' }, '⏳ ניתן להגדיר תוצאה רק החל מהיום שאחרי האירוע'));
     }
-    root.append(card);
-  }
+    return card;
+  };
+
+  for (const q of questions) root.append(buildCard(q));
 }
 
 // ---------------- users tab ----------------
