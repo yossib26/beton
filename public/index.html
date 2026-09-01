@@ -197,6 +197,38 @@
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
+  /* comic scattered crowd of every user in the system */
+  #crowd { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 4; }
+  .crowd-member {
+    position: absolute;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    opacity: .9;
+    animation: crowd-pop .45s cubic-bezier(.2,1.6,.4,1) both,
+               crowd-bob var(--dur, 4s) ease-in-out infinite;
+    animation-delay: var(--pop, 0s), var(--delay, 0s);
+  }
+  .crowd-member .face {
+    font-size: 2rem; line-height: 1;
+    transform: rotate(var(--tilt, 0deg));
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));
+  }
+  .crowd-member .tag {
+    font-size: .62rem; font-weight: 700; color: var(--text);
+    background: rgba(2,6,23,.82); border: 1px solid var(--line);
+    padding: 1px 6px; border-radius: 999px;
+    max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .crowd-member.admin .tag { color: var(--gold); border-color: var(--gold); }
+  @keyframes crowd-bob {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50%      { transform: translateY(-11px) rotate(3deg); }
+  }
+  @keyframes crowd-pop { from { transform: scale(0) rotate(-40deg); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .crowd-member { animation: crowd-pop .3s both; }
+  }
+  header, nav.tabs { z-index: 20; }
+
   @media (min-width: 481px) {
     body { align-items: center; padding: 20px 0; background: #020617; }
     #app { border-radius: 22px; overflow: hidden; min-height: min(880px, 92vh); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
@@ -213,7 +245,7 @@
     </div>
     <div class="row" style="gap:6px">
       <a class="btn ghost sm" id="adminLink" href="/admin.html" hidden>ניהול ⚙️</a>
-      <button class="btn ghost sm" id="logoutBtn">יציאה</button>
+      <button class="btn ghost sm" id="logoutBtn" type="button">↩ התנתקות</button>
     </div>
   </header>
   <main id="view"></main>
@@ -340,8 +372,40 @@ function renderTabs() {
 
 function route() {
   renderTabs();
+  const crowd = $('#crowd');
+  if (crowd) crowd.hidden = state.tab !== 'bets';
   if (state.tab === 'bets') renderBets();
   else if (state.tab === 'board') renderBoard();
+}
+
+// ---------------- comic crowd of all users ----------------
+const CROWD_FACES = ['🤪','😜','🤠','🥸','🤓','😎','🙃','🤡','👻','🐸','🦖','👽','🤖','🥳','😹','🐵','🦄','🐙'];
+const seeded = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
+
+async function loadCrowd() {
+  let users;
+  try { users = await api('/api/users'); } catch { return; }
+  let crowd = $('#crowd');
+  if (!crowd) { crowd = el('div', { id: 'crowd' }); $('#app').append(crowd); }
+  crowd.innerHTML = '';
+  users.forEach((u) => {
+    const top = (6 + seeded(u.id * 3 + 1) * 82).toFixed(1);
+    const left = (3 + seeded(u.id * 7 + 2) * 84).toFixed(1);
+    const dur = (3 + seeded(u.id * 5 + 4) * 3).toFixed(2);
+    const delay = (seeded(u.id * 11 + 6) * -6).toFixed(2);
+    const pop = (seeded(u.id * 19 + 3) * 0.6).toFixed(2);
+    const tilt = Math.round(seeded(u.id * 13 + 8) * 24 - 12);
+    const face = CROWD_FACES[Math.floor(seeded(u.id * 17 + 9) * CROWD_FACES.length)];
+    crowd.append(el('div', {
+      className: 'crowd-member' + (u.is_admin ? ' admin' : ''),
+      style: `top:${top}%;left:${left}%;--dur:${dur}s;--delay:${delay}s;--pop:${pop}s;--tilt:${tilt}deg`,
+      title: u.name,
+    },
+      el('div', { className: 'face' }, face),
+      el('div', { className: 'tag' }, (u.is_admin ? '👑 ' : '') + u.name),
+    ));
+  });
+  crowd.hidden = state.tab !== 'bets';
 }
 
 function dateBar(onChange, { maxDate } = {}) {
@@ -383,7 +447,7 @@ async function renderBets() {
   view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets, { maxDate: todayISO() }));
 
   if (!questions.length) {
-    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'));
+    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'), logoutFooter());
     return;
   }
 
@@ -430,7 +494,11 @@ async function renderBets() {
     }
     view.append(card);
   }
+  view.append(logoutFooter());
 }
+
+const logoutFooter = () => el('div', { style: 'margin-top:24px' },
+  el('button', { className: 'btn ghost', style: 'width:100%', type: 'button', onclick: logout }, '↩ התנתקות'));
 
 // ---------------- Leaderboard ----------------
 async function renderBoard() {
@@ -465,12 +533,15 @@ function boot() {
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
   $('#adminLink').hidden = !state.user.is_admin;
   route();
+  loadCrowd();
 }
-$('#logoutBtn').onclick = async () => {
+async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
   state.user = null;
+  $('#crowd')?.remove();
   renderAuth();
-};
+}
+$('#logoutBtn').onclick = logout;
 
 (async () => {
   try {
