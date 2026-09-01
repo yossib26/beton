@@ -462,8 +462,13 @@ async function renderBets() {
     questions = await api('/api/questions?date=' + state.date);
   } catch (e) { toast(e.message, true); return; }
 
+  const isToday = state.date === todayISO();
+
   view.innerHTML = '';
   view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets, { maxDate: todayISO() }));
+  if (!isToday) {
+    view.append(el('div', { className: 'card muted' }, '👁️ צפייה בלבד — ניתן להמר רק על אירועי היום.'));
+  }
 
   if (!questions.length) {
     view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'), logoutFooter());
@@ -484,12 +489,12 @@ async function renderBets() {
       const wrongPick = q.status === 'resolved' && picked && !isCorrect;
       const btn = el('button', {
         className: 'answer' + (picked ? ' picked' : '') + (isCorrect ? ' correct' : '') + (wrongPick ? ' wrongpick' : ''),
-        disabled: q.status !== 'open',
+        disabled: q.status !== 'open' || !isToday,
       },
         el('span', {}, a.text + (picked ? '  ✓' : '')),
         el('span', { className: 'val' }, fmt(a.value)),
       );
-      if (q.status === 'open') {
+      if (q.status === 'open' && isToday) {
         btn.onclick = async () => {
           try {
             await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
