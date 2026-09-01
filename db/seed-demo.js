@@ -62,6 +62,14 @@ async function main() {
     );
     console.log(`removed ${del.rowCount} existing demo questions (${past ? 'past' : 'today onward'})`);
 
+    // deterministic pseudo-random in [0,1)
+    const rnd = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
+
+    const users = past
+      ? (await client.query('SELECT id FROM users ORDER BY id')).rows.map((r) => r.id)
+      : [];
+    let bets = 0;
+
     let created = 0;
     for (let d = 0; d < DAYS; d++) {
       const dayOffset = past ? -(d + 1) : d; // past: yesterday .. -DAYS
@@ -90,8 +98,28 @@ async function main() {
 
         if (past) {
           // deterministic "correct" answer so the leaderboard has data
-          const correct = answerIds[(idx * 7 + 2) % answerIds.length];
-          await client.query('UPDATE questions SET correct_answer_id = $1 WHERE id = $2', [correct, qid]);
+          const correctIdx = (idx * 7 + 2) % answerIds.length;
+          await client.query('UPDATE questions SET correct_answer_id = $1 WHERE id = $2', [answerIds[correctIdx], qid]);
+
+          // demo bets: each user bets on ~half the questions, with a
+          // per-user "skill" driving how often they pick the right answer
+          for (const uid of users) {
+            if (rnd(uid * 7 + qid * 13) >= 0.55) continue;
+            const skill = 0.3 + rnd(uid * 101) * 0.5; // 0.30–0.80
+            let pick;
+            if (rnd(uid * 3 + qid * 17) < skill) {
+              pick = answerIds[correctIdx];
+            } else {
+              const wrong = answerIds.filter((_, i) => i !== correctIdx);
+              pick = wrong[Math.floor(rnd(uid * 5 + qid * 11) * wrong.length)];
+            }
+            await client.query(
+              `INSERT INTO bets (user_id, question_id, answer_id) VALUES ($1, $2, $3)
+               ON CONFLICT (user_id, question_id) DO NOTHING`,
+              [uid, qid, pick]
+            );
+            bets++;
+          }
         }
         created++;
       }
@@ -99,6 +127,7 @@ async function main() {
 
     await client.query('COMMIT');
     console.log(`created ${created} demo questions across ${DAYS} days (${PER_DAY}/day, status ${past ? 'resolved' : 'open'})`);
+    if (past) console.log(`created ${bets} demo bets across ${users.length} users`);
 
     const summary = await pool.query(
       `SELECT event_date, COUNT(*)::int AS questions,
