@@ -138,13 +138,18 @@ const heDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('he-IL', 
 
 const state = { user: null, tab: 'events', date: todayISO() };
 
+// palette users can be given in the admin console (kept in sync with the login page)
+const USER_ICONS = ['😀','😎','🤩','🥳','🤠','🤖','👻','👽','🐸','🐵','🦊','🐼','🦁','🐯','🐨','🦄','🐙','🦖','🦈','🐧','🦉','🐝','⭐','🔥','⚽','🏀','🎯','🎲','💪','🧠','🃏','🚀','🍀','🌈','🍕','🎸'];
+
 // ---------------- login gate ----------------
+const ADMIN_DEFAULT = { username: 'yossi', password: 'beton123' };
+
 function renderGate(msg) {
   $('#hdr').hidden = true;
   const m = $('#main');
   m.innerHTML = '';
-  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off' });
-  const passI = el('input', { placeholder: 'סיסמה', type: 'password' });
+  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', value: ADMIN_DEFAULT.username });
+  const passI = el('input', { placeholder: 'סיסמה', type: 'password', value: ADMIN_DEFAULT.password });
   const btn = el('button', { className: 'btn primary grow', type: 'button' }, 'כניסת מנהל');
   btn.onclick = async () => {
     try {
@@ -161,7 +166,7 @@ function renderGate(msg) {
       el('label', {}, 'שם משתמש'), userI,
       el('label', {}, 'סיסמה'), passI,
       el('div', { className: 'row', style: 'margin-top:16px' }, btn),
-      el('p', { className: 'muted', style: 'margin-bottom:0' }, 'ברירת מחדל: yossi / beton123'),
+      el('p', { className: 'muted', style: 'margin-bottom:0' }, 'משתמש ברירת מחדל: yossi / beton123 (מולא מראש)'),
     ),
   ));
 }
@@ -356,84 +361,107 @@ async function renderUsers(root) {
   root.innerHTML = '';
   root.append(el('h2', {}, 'ניהול משתמשים'));
 
-  // create user
-  const nI = el('input', { placeholder: 'שם מלא' });
-  const uI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off' });
-  const pI = el('input', { placeholder: 'סיסמה', type: 'text' });
-  const aI = el('input', { type: 'checkbox' });
-  const addBtn = el('button', { className: 'btn primary', type: 'button' }, 'הוסף משתמש');
-  addBtn.onclick = async () => {
-    try {
-      await api('/api/admin/users', { method: 'POST', body: { name: nI.value.trim(), username: uI.value.trim(), password: pI.value, is_admin: aI.checked } });
-      toast('המשתמש נוצר');
-      nI.value = uI.value = pI.value = ''; aI.checked = false;
-      renderUsers(root);
-    } catch (e) { toast(e.message, true); }
-  };
-  root.append(el('div', { className: 'card' },
-    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ משתמש חדש'),
-    el('div', { className: 'row wrap-row' },
-      el('div', { className: 'grow' }, el('label', {}, 'שם'), nI),
-      el('div', { className: 'grow' }, el('label', {}, 'שם משתמש'), uI),
-      el('div', { className: 'grow' }, el('label', {}, 'סיסמה'), pI),
-    ),
-    el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, aI, 'הרשאת ניהול'),
-    el('div', { className: 'row', style: 'margin-top:12px' }, addBtn),
-  ));
+  const admins = users.filter((u) => u.is_admin);
+  const bettors = users.filter((u) => !u.is_admin);
 
-  // users table
-  const tbl = el('table');
-  tbl.append(el('tr', {},
-    el('th', {}, '#'), el('th', {}, 'שם'), el('th', {}, 'משתמש'),
-    el('th', {}, 'תפקיד'), el('th', {}, 'הימורים'), el('th', {}, 'פעולות'),
-  ));
-  for (const u of users) {
-    const isMe = u.id === state.user.id;
-    const roleBtn = el('button', {
-      className: 'btn sm ' + (u.is_admin ? 'primary' : 'ghost'),
-      type: 'button',
-      disabled: isMe,
-      onclick: async () => {
-        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { is_admin: !u.is_admin } }); renderUsers(root); }
-        catch (e) { toast(e.message, true); }
-      },
-    }, u.is_admin ? 'מנהל' : 'מהמר');
-    const resetBtn = el('button', {
-      className: 'btn ghost sm', type: 'button',
-      onclick: async () => {
-        const np = prompt('סיסמה חדשה עבור ' + u.username + ':');
-        if (!np) return;
-        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { password: np } }); toast('הסיסמה אופסה'); }
-        catch (e) { toast(e.message, true); }
-      },
-    }, 'איפוס סיסמה');
-    const renameBtn = el('button', {
-      className: 'btn ghost sm', type: 'button',
-      onclick: async () => {
+  const addForm = (asAdmin) => {
+    const nI = el('input', { placeholder: 'שם מלא' });
+    const uI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off' });
+    const pI = el('input', { placeholder: 'סיסמה', type: 'text' });
+    const btn = el('button', { className: 'btn primary', type: 'button' }, asAdmin ? 'הוסף מנהל' : 'הוסף מהמר');
+    btn.onclick = async () => {
+      try {
+        await api('/api/admin/users', { method: 'POST', body: {
+          name: nI.value.trim(), username: uI.value.trim(), password: pI.value, is_admin: asAdmin,
+        } });
+        toast(asAdmin ? 'מנהל נוצר' : 'מהמר נוצר');
+        renderUsers(root);
+      } catch (e) { toast(e.message, true); }
+    };
+    return el('div', { className: 'card' },
+      el('div', { style: 'font-weight:700;margin-bottom:8px' }, asAdmin ? '➕ מנהל חדש' : '➕ מהמר חדש'),
+      el('div', { className: 'row wrap-row' },
+        el('div', { className: 'grow' }, el('label', {}, 'שם'), nI),
+        el('div', { className: 'grow' }, el('label', {}, 'שם משתמש'), uI),
+        el('div', { className: 'grow' }, el('label', {}, 'סיסמה'), pI),
+      ),
+      el('div', { className: 'row', style: 'margin-top:12px' }, btn),
+    );
+  };
+
+  const table = (list, asAdmin) => {
+    const head = [el('th', {}, '#'), el('th', {}, 'שם'), el('th', {}, 'משתמש'), el('th', {}, 'אייקון')];
+    if (!asAdmin) head.push(el('th', {}, 'הימורים'));
+    head.push(el('th', {}, 'פעולות'));
+    const tbl = el('table');
+    tbl.append(el('tr', {}, ...head));
+    if (!list.length) tbl.append(el('tr', {}, el('td', { className: 'muted', colSpan: head.length }, '— אין —')));
+
+    for (const u of list) {
+      const isMe = u.id === state.user.id;
+      const mk = (label, cls, fn) => el('button', { className: 'btn sm ' + cls, type: 'button', onclick: fn }, label);
+      const renameBtn = mk('שנה שם', 'ghost', async () => {
         const nn = prompt('שם חדש:', u.name);
         if (!nn || nn.trim() === u.name) return;
         try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { name: nn.trim() } }); renderUsers(root); }
         catch (e) { toast(e.message, true); }
-      },
-    }, 'שנה שם');
-    const delBtn = el('button', {
-      className: 'btn danger sm', type: 'button', disabled: isMe,
-      onclick: async () => {
-        if (!confirm(`למחוק את ${u.name} וכל ההימורים שלו?`)) return;
-        try { await api('/api/admin/users/' + u.id, { method: 'DELETE' }); renderUsers(root); }
+      });
+      const resetBtn = mk('איפוס סיסמה', 'ghost', async () => {
+        const np = prompt('סיסמה חדשה עבור ' + u.username + ':');
+        if (!np) return;
+        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { password: np } }); toast('הסיסמה אופסה'); }
         catch (e) { toast(e.message, true); }
-      },
-    }, 'מחק');
-    tbl.append(el('tr', {},
-      el('td', {}, String(u.id)),
-      el('td', {}, u.name + (isMe ? ' (אתה)' : '')),
-      el('td', { className: 'muted' }, u.username || '—'),
-      el('td', {}, roleBtn),
-      el('td', { className: 'muted' }, String(u.bets_count)),
-      el('td', {}, el('div', { className: 'row wrap-row' }, renameBtn, resetBtn, delBtn)),
-    ));
-  }
-  root.append(el('div', { className: 'card tbl-scroll' }, tbl));
+      });
+      const moveBtn = el('button', {
+        className: 'btn sm ghost', type: 'button', disabled: isMe,
+        onclick: async () => {
+          if (!confirm(`להעביר את ${u.name} ל${asAdmin ? 'מהמרים' : 'מנהלים'}?`)) return;
+          try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { is_admin: !asAdmin } }); renderUsers(root); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, asAdmin ? '↓ העבר למהמרים' : '↑ הפוך למנהל');
+      const delBtn = el('button', {
+        className: 'btn danger sm', type: 'button', disabled: isMe,
+        onclick: async () => {
+          if (!confirm(`למחוק את ${u.name}${asAdmin ? '' : ' וכל ההימורים שלו'}?`)) return;
+          try { await api('/api/admin/users/' + u.id, { method: 'DELETE' }); renderUsers(root); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, 'מחק');
+      const iconSel = el('select', { style: 'width:auto;font-size:1.05rem;padding:6px 8px' });
+      iconSel.append(el('option', { value: '' }, '🎲'));
+      for (const ic of USER_ICONS) {
+        const o = el('option', { value: ic }, ic);
+        if (u.icon === ic) o.selected = true;
+        iconSel.append(o);
+      }
+      iconSel.onchange = async () => {
+        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { icon: iconSel.value } }); toast('האייקון עודכן'); }
+        catch (e) { toast(e.message, true); }
+      };
+      const cells = [
+        el('td', {}, String(u.id)),
+        el('td', {}, u.name + (isMe ? ' (אתה)' : '')),
+        el('td', { className: 'muted' }, u.username || '—'),
+        el('td', {}, iconSel),
+      ];
+      if (!asAdmin) cells.push(el('td', { className: 'muted' }, String(u.bets_count)));
+      cells.push(el('td', {}, el('div', { className: 'row wrap-row' }, renameBtn, resetBtn, moveBtn, delBtn)));
+      tbl.append(el('tr', {}, ...cells));
+    }
+    return el('div', { className: 'card tbl-scroll' }, tbl);
+  };
+
+  root.append(
+    el('div', { style: 'font-weight:800;color:var(--gold);margin:6px 0' }, `👑 מנהלי המערכת (${admins.length})`),
+    el('p', { className: 'muted', style: 'margin-top:0' }, 'חשבונות ניהול בלבד — לא משתתפים בהימורים ולא מופיעים בטבלת הדירוג.'),
+    addForm(true),
+    table(admins, true),
+    el('hr', { className: 'sep', style: 'margin:20px 0' }),
+    el('div', { style: 'font-weight:800;margin:6px 0' }, `🎯 מהמרים (${bettors.length})`),
+    addForm(false),
+    table(bettors, false),
+  );
 }
 
 // ---------------- init ----------------

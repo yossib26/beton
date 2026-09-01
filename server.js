@@ -179,10 +179,11 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   res.json(saved.rows[0]);
 }));
 
-// --- roster (public: names + score shown on the login page) --------
+// --- roster (public: bettor names + score shown on the login page) --
+// admins are management accounts, not participants — excluded here
 app.get('/api/users', wrap(async (_req, res) => {
   const { rows } = await pool.query(`
-    SELECT u.id, u.name, u.is_admin,
+    SELECT u.id, u.name, u.is_admin, u.icon,
            COALESCE(SUM(
              CASE WHEN q.status = 'resolved' AND b.answer_id = q.correct_answer_id
                   THEN a.value ELSE 0 END
@@ -191,6 +192,7 @@ app.get('/api/users', wrap(async (_req, res) => {
       LEFT JOIN bets b ON b.user_id = u.id
       LEFT JOIN questions q ON q.id = b.question_id
       LEFT JOIN answers a ON a.id = b.answer_id
+     WHERE u.is_admin = false
      GROUP BY u.id
      ORDER BY u.id
   `);
@@ -211,6 +213,7 @@ app.get('/api/leaderboard', requireAuth, wrap(async (_req, res) => {
       LEFT JOIN bets b ON b.user_id = u.id
       LEFT JOIN questions q ON q.id = b.question_id
       LEFT JOIN answers a ON a.id = b.answer_id
+     WHERE u.is_admin = false
      GROUP BY u.id
      ORDER BY score DESC, hits DESC, u.name ASC
   `);
@@ -374,7 +377,7 @@ app.delete('/api/admin/answers/:id', requireAdmin, wrap(async (req, res) => {
 
 app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
   const { rows } = await pool.query(`
-    SELECT u.id, u.name, u.username, u.is_admin, u.created_at,
+    SELECT u.id, u.name, u.username, u.is_admin, u.icon, u.created_at,
            COUNT(b.id)::int AS bets_count
       FROM users u
       LEFT JOIN bets b ON b.user_id = u.id
@@ -405,9 +408,12 @@ app.post('/api/admin/users', requireAdmin, wrap(async (req, res) => {
 
 app.patch('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
   const id = Number(req.params.id);
-  const name = req.body?.name != null ? String(req.body.name).trim() : null;
-  const password = req.body?.password || null;
-  const isAdmin = req.body?.is_admin;
+  const body = req.body || {};
+  const name = body.name != null ? String(body.name).trim() : null;
+  const password = body.password || null;
+  const isAdmin = body.is_admin;
+  const hasIcon = Object.prototype.hasOwnProperty.call(body, 'icon');
+  const icon = hasIcon ? (String(body.icon || '').slice(0, 16) || null) : null;
   if (id === req.user.id && isAdmin === false) {
     return res.status(400).json({ error: 'אי אפשר להסיר לעצמך הרשאת ניהול' });
   }
@@ -418,10 +424,11 @@ app.patch('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
     `UPDATE users SET
         name = COALESCE($2, name),
         is_admin = COALESCE($3, is_admin),
-        password_hash = COALESCE($4, password_hash)
+        password_hash = COALESCE($4, password_hash),
+        icon = CASE WHEN $5 THEN $6 ELSE icon END
       WHERE id = $1
-      RETURNING id, name, username, is_admin, created_at`,
-    [id, name, typeof isAdmin === 'boolean' ? isAdmin : null, password ? hashPassword(password) : null]
+      RETURNING id, name, username, is_admin, icon, created_at`,
+    [id, name, typeof isAdmin === 'boolean' ? isAdmin : null, password ? hashPassword(password) : null, hasIcon, icon]
   );
   if (!rows.length) return res.status(404).json({ error: 'משתמש לא נמצא' });
   res.json(rows[0]);

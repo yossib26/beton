@@ -15,6 +15,7 @@ ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS icon TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_key ON users (lower(username)) WHERE username IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -57,6 +58,9 @@ const SEED_USERS = [
   { name: 'Yossi Basson', email: 'oriki.basson@gmail.com', username: 'yossi', password: 'beton123', is_admin: true },
   { name: 'Dana Levi', email: 'dana.levi@example.com', username: 'dana', password: 'beton123', is_admin: false },
   { name: 'Avi Cohen', email: 'avi.cohen@example.com', username: 'avi', password: 'beton123', is_admin: false },
+  { name: 'Noa Bar', email: 'noa.bar@example.com', username: 'noa', password: 'beton123', is_admin: false },
+  { name: 'Tomer Gal', email: 'tomer.gal@example.com', username: 'tomer', password: 'beton123', is_admin: false },
+  { name: 'Shira Peled', email: 'shira.peled@example.com', username: 'shira', password: 'beton123', is_admin: false },
 ];
 
 async function main() {

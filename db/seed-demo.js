@@ -66,7 +66,7 @@ async function main() {
     const rnd = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
 
     const users = past
-      ? (await client.query('SELECT id FROM users ORDER BY id')).rows.map((r) => r.id)
+      ? (await client.query('SELECT id FROM users WHERE is_admin = false ORDER BY id')).rows.map((r) => r.id)
       : [];
     let bets = 0;
 

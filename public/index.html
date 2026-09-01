@@ -413,7 +413,7 @@ async function renderLoginFaces(container) {
     const delay = (seeded(u.id * 11 + 6) * -6).toFixed(2);
     const pop = (Math.random() * 0.6).toFixed(2);
     const tilt = Math.round(seeded(u.id * 13 + 8) * 20 - 10);
-    const face = CROWD_FACES[Math.floor(seeded(u.id * 17 + 9) * CROWD_FACES.length)];
+    const face = u.icon || CROWD_FACES[Math.floor(seeded(u.id * 17 + 9) * CROWD_FACES.length)];
     const faceWrap = el('div', { className: 'face-wrap' }, el('div', { className: 'face' }, face));
     if (isLeader) faceWrap.prepend(el('span', { className: 'crown' }, '👑'));
     container.append(el('div', {
