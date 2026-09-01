@@ -419,7 +419,7 @@ function dateBar(onChange) {
       className: 'btn sm' + (isToday ? ' primary' : ''), type: 'button',
       disabled: isToday, onclick: () => { state.date = today; onChange(); },
     }, 'היום'),
-    el('button', { className: 'btn sm', type: 'button', disabled: isToday, onclick: () => shift(1) }, 'מחר ›'),
+    el('button', { className: 'btn sm', type: 'button', disabled: isToday, onclick: () => shift(1) }, 'היום הבא ›'),
   );
 }
 
