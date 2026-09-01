@@ -278,6 +278,11 @@ const api = async (path, opts = {}) => {
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (res.status === 401 && path !== '/api/auth/me') {
+    state.user = null;
+    renderAuth();
+    throw new Error(data?.error || 'נדרשת התחברות');
+  }
   if (!res.ok) throw new Error(data?.error || `שגיאה ${res.status}`);
   return data;
 };
@@ -348,7 +353,11 @@ function renderTabs() {
   for (const d of defs) {
     tabs.append(el('button', {
       className: state.tab === d.id ? 'active' : '',
-      onclick: () => { state.tab = d.id; route(); },
+      onclick: () => {
+        if (!state.user) return renderAuth();
+        state.tab = d.id;
+        route();
+      },
     }, el('span', { className: 'ico' }, d.ico), d.label));
   }
 }
