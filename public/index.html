@@ -200,7 +200,7 @@
   /* comic strip of every user in the system, top of the login page */
   .faces {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
-    gap: 10px 14px; padding: 18px 8px 6px; min-height: 40px;
+    gap: 10px 14px; padding: 30px 8px 6px; min-height: 40px;
   }
   .face-chip {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -208,10 +208,17 @@
                crowd-bob var(--dur, 4s) ease-in-out infinite;
     animation-delay: var(--pop, 0s), var(--delay, 0s);
   }
+  .face-chip .face-wrap { position: relative; display: flex; }
   .face-chip .face {
     font-size: var(--size, 1.9rem); line-height: 1;
     transform: rotate(var(--tilt, 0deg));
     filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));
+  }
+  .face-chip .crown {
+    position: absolute; top: -.5em; left: 50%;
+    font-size: calc(var(--size, 1.9rem) * .6);
+    transform: translateX(-50%) rotate(-14deg);
+    pointer-events: none;
   }
   .face-chip .tag {
     font-size: .62rem; font-weight: 700; color: var(--text);
@@ -407,13 +414,15 @@ async function renderLoginFaces(container) {
     const pop = (Math.random() * 0.6).toFixed(2);
     const tilt = Math.round(seeded(u.id * 13 + 8) * 20 - 10);
     const face = CROWD_FACES[Math.floor(seeded(u.id * 17 + 9) * CROWD_FACES.length)];
+    const faceWrap = el('div', { className: 'face-wrap' }, el('div', { className: 'face' }, face));
+    if (isLeader) faceWrap.prepend(el('span', { className: 'crown' }, '👑'));
     container.append(el('div', {
       className: 'face-chip' + (isLeader ? ' leader' : ''),
       style: `--size:${size}rem;--dur:${dur}s;--delay:${delay}s;--pop:${pop}s;--tilt:${tilt}deg`,
       title: `${u.name} · ${fmt(u.score)} נק'`,
     },
-      el('div', { className: 'face' }, face),
-      el('div', { className: 'tag' }, (isLeader ? '👑 ' : '') + u.name),
+      faceWrap,
+      el('div', { className: 'tag' }, u.name),
     ));
   });
 }
