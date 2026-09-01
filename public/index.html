@@ -1,75 +1,575 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1.5rem;
-      font-family: system-ui, sans-serif;
-      background: #f4f4f5;
-      color: #18181b;
-    }
-    h1 { font-size: 3rem; margin: 0; }
-    section {
-      background: #fff;
-      border: 1px solid #e4e4e7;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      min-width: 320px;
-    }
-    h2 { font-size: 1rem; margin: 0 0 .75rem; color: #52525b; }
-    ul { list-style: none; margin: 0; padding: 0; }
-    li { padding: .4rem 0; border-bottom: 1px solid #f4f4f5; }
-    li:last-child { border-bottom: 0; }
-    .email { color: #71717a; font-size: .85rem; }
-    form { display: flex; gap: .5rem; margin-top: .75rem; }
-    input { flex: 1; padding: .4rem .6rem; border: 1px solid #d4d4d8; border-radius: 8px; font: inherit; }
-    button { padding: .4rem .9rem; border: 0; border-radius: 8px; background: #18181b; color: #fff; font: inherit; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>בטון · הימורים</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #334155;
+    --line: #475569;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-ink: #04222e;
+    --good: #4ade80;
+    --bad: #f87171;
+    --gold: #fbbf24;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    background: #020617;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+  }
+  #app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  header {
+    padding: 14px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header .brand { font-weight: 800; letter-spacing: .5px; }
+  header .who { font-size: .8rem; color: var(--muted); }
+  main { flex: 1; padding: 16px; padding-bottom: 88px; }
+  nav.tabs {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  nav.tabs button {
+    flex: 1;
+    padding: 12px 4px;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: .78rem;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+  }
+  nav.tabs button.active { color: var(--accent); }
+  nav.tabs button .ico { font-size: 1.2rem; }
+
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .grow { flex: 1; }
+
+  input, select {
+    width: 100%;
+    padding: 11px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    font: inherit;
+  }
+  input::placeholder { color: var(--muted); }
+  label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+
+  button.btn {
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.btn.ghost { background: none; }
+  button.btn.danger { color: var(--bad); border-color: var(--bad); background: none; }
+  button.btn:disabled { opacity: .5; }
+  button.btn.sm { padding: 7px 10px; font-size: .82rem; }
+
+  .answers { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .answer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  .answer .val {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--bg);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: .82rem;
+  }
+  .answer.picked { border-color: var(--accent); background: rgba(56,189,248,.14); }
+  .answer.picked .val { color: var(--accent); }
+  .answer.correct { border-color: var(--good); background: rgba(74,222,128,.14); }
+  .answer.correct .val { color: var(--good); }
+  .answer.wrongpick { border-color: var(--bad); background: rgba(248,113,113,.12); }
+  .answer:disabled { cursor: default; }
+
+  .pill {
+    display: inline-block;
+    font-size: .72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .pill.open { color: var(--good); border-color: var(--good); }
+  .pill.closed { color: var(--gold); border-color: var(--gold); }
+  .pill.resolved { color: var(--accent); border-color: var(--accent); }
+
+  .datebar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 8px; }
+  .datebar .d { font-weight: 700; }
+
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .lb-row:last-child { border-bottom: 0; }
+  .lb-rank { width: 26px; text-align: center; font-weight: 800; color: var(--muted); }
+  .lb-row.me { background: rgba(56,189,248,.1); border-radius: 10px; }
+  .lb-row .lb-score { margin-inline-start: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lb-row:nth-child(1) .lb-rank { color: var(--gold); }
+
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: .85rem;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+    max-width: 90%;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--bad); color: #fecaca; }
+
+  .center { text-align: center; padding: 40px 10px; color: var(--muted); }
+  .adm-answer { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .adm-answer input.txt { flex: 1; }
+  .adm-answer input.num { width: 74px; text-align: center; }
+  hr.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  @media (min-width: 481px) {
+    body { align-items: center; padding: 20px 0; background: #020617; }
+    #app { border-radius: 22px; overflow: hidden; min-height: min(880px, 92vh); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+    nav.tabs { position: sticky; }
+  }
+</style>
 </head>
 <body>
-  <h1>Hello</h1>
-  <section>
-    <h2>משתמשים</h2>
-    <ul id="users"></ul>
-    <form id="add">
-      <input name="name" placeholder="שם" required>
-      <input name="email" type="email" placeholder="אימייל" required>
-      <button type="submit">הוסף</button>
-    </form>
-  </section>
-  <script>
-    const list = document.getElementById('users');
+<div id="app">
+  <header id="hdr" hidden>
+    <div>
+      <div class="brand">בטון 🏗️</div>
+      <div class="who" id="who"></div>
+    </div>
+    <button class="btn ghost sm" id="logoutBtn">יציאה</button>
+  </header>
+  <main id="view"></main>
+  <nav class="tabs" id="tabs" hidden></nav>
+</div>
+<div class="toast" id="toast"></div>
 
-    async function load() {
-      const res = await fetch('/api/users');
-      const users = await res.json();
-      list.innerHTML = users.map(u =>
-        `<li>${u.name} <span class="email">${u.email}</span></li>`
-      ).join('') || '<li class="email">אין משתמשים עדיין</li>';
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids.flat()) n.append(k?.nodeType ? k : document.createTextNode(k ?? ''));
+  return n;
+};
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, {
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `שגיאה ${res.status}`);
+  return data;
+};
+let toastT;
+const toast = (msg, isErr = false) => {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => (t.className = 'toast'), 2200);
+};
+const fmt = (n) => (n > 0 ? '+' : '') + (Math.round(n * 100) / 100);
+const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+const heDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric' });
+
+const state = { user: null, tab: 'bets', date: todayISO() };
+
+// ---------------- Auth screen ----------------
+function renderAuth() {
+  $('#hdr').hidden = true;
+  $('#tabs').hidden = true;
+  const view = $('#view');
+  view.innerHTML = '';
+  let mode = 'login';
+
+  const nameI = el('input', { placeholder: 'שם מלא' });
+  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off', autocorrect: 'off' });
+  const passI = el('input', { placeholder: 'סיסמה', type: 'password' });
+  const nameWrap = el('div', {}, el('label', {}, 'שם'), nameI);
+  const submit = el('button', { className: 'btn primary grow' });
+  const toggle = el('button', { className: 'btn ghost grow' });
+
+  const paint = () => {
+    submit.textContent = mode === 'login' ? 'כניסה' : 'הרשמה';
+    toggle.textContent = mode === 'login' ? 'אין לי חשבון' : 'יש לי חשבון';
+    nameWrap.hidden = mode === 'login';
+  };
+  paint();
+
+  toggle.onclick = () => { mode = mode === 'login' ? 'register' : 'login'; paint(); };
+  submit.onclick = async () => {
+    try {
+      const body = { username: userI.value.trim(), password: passI.value };
+      if (mode === 'register') body.name = nameI.value.trim();
+      const path = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      state.user = await api(path, { method: 'POST', body });
+      boot();
+    } catch (e) { toast(e.message, true); }
+  };
+
+  view.append(
+    el('div', { className: 'center', style: 'font-size:2.6rem;padding-bottom:8px' }, '🏗️'),
+    el('h2', { style: 'text-align:center' }, 'בטון · הימורי אירועים'),
+    el('p', { className: 'muted', style: 'text-align:center;margin-top:-4px' }, 'התחבר כדי להמר על אירועי היום'),
+    el('div', { className: 'card' },
+      nameWrap,
+      el('label', {}, 'שם משתמש'), userI,
+      el('label', {}, 'סיסמה'), passI,
+      el('div', { className: 'row', style: 'margin-top:16px' }, submit),
+      el('div', { className: 'row', style: 'margin-top:8px' }, toggle),
+    ),
+  );
+}
+
+// ---------------- Tabs / shell ----------------
+function renderTabs() {
+  const tabs = $('#tabs');
+  tabs.hidden = false;
+  tabs.innerHTML = '';
+  const defs = [
+    { id: 'bets', label: 'הימורים', ico: '🎯' },
+    { id: 'board', label: 'טבלה', ico: '🏆' },
+  ];
+  if (state.user?.is_admin) defs.push({ id: 'admin', label: 'ניהול', ico: '⚙️' });
+  for (const d of defs) {
+    tabs.append(el('button', {
+      className: state.tab === d.id ? 'active' : '',
+      onclick: () => { state.tab = d.id; route(); },
+    }, el('span', { className: 'ico' }, d.ico), d.label));
+  }
+}
+
+function route() {
+  renderTabs();
+  if (state.tab === 'bets') renderBets();
+  else if (state.tab === 'board') renderBoard();
+  else if (state.tab === 'admin') renderAdmin();
+}
+
+function dateBar(onChange) {
+  const shift = (days) => {
+    const d = new Date(state.date + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    state.date = d.toLocaleDateString('sv-SE');
+    onChange();
+  };
+  const picker = el('input', { type: 'date', value: state.date, style: 'width:auto' });
+  picker.onchange = () => { state.date = picker.value; onChange(); };
+  return el('div', { className: 'datebar' },
+    el('button', { className: 'btn sm', onclick: () => shift(-1) }, '‹ אתמול'),
+    picker,
+    el('button', { className: 'btn sm', onclick: () => shift(1) }, 'מחר ›'),
+  );
+}
+
+// ---------------- Bets screen ----------------
+async function renderBets() {
+  $('#hdr').hidden = false;
+  const view = $('#view');
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'אירועי היום'), dateBar(renderBets), el('div', { className: 'center' }, 'טוען…'));
+  let questions;
+  try {
+    questions = await api('/api/questions?date=' + state.date);
+  } catch (e) { toast(e.message, true); return; }
+
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets));
+
+  if (!questions.length) {
+    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'));
+    return;
+  }
+
+  for (const q of questions) {
+    const card = el('div', { className: 'card' });
+    card.append(el('div', { className: 'row' },
+      el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
+      el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
+    ));
+
+    const box = el('div', { className: 'answers' });
+    for (const a of q.answers) {
+      const picked = q.my_answer_id === a.id;
+      const isCorrect = q.status === 'resolved' && q.correct_answer_id === a.id;
+      const wrongPick = q.status === 'resolved' && picked && !isCorrect;
+      const btn = el('button', {
+        className: 'answer' + (picked ? ' picked' : '') + (isCorrect ? ' correct' : '') + (wrongPick ? ' wrongpick' : ''),
+        disabled: q.status !== 'open',
+      },
+        el('span', {}, a.text + (picked ? '  ✓' : '')),
+        el('span', { className: 'val' }, fmt(a.value)),
+      );
+      if (q.status === 'open') {
+        btn.onclick = async () => {
+          try {
+            await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
+            q.my_answer_id = a.id;
+            renderBets();
+            toast('ההימור נשמר');
+          } catch (e) { toast(e.message, true); }
+        };
+      }
+      box.append(btn);
+    }
+    card.append(box);
+
+    if (q.status === 'resolved' && q.my_answer_id != null) {
+      const hit = q.my_answer_id === q.correct_answer_id;
+      const gained = hit ? q.answers.find((a) => a.id === q.correct_answer_id)?.value ?? 0 : 0;
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' },
+        hit ? `פגעת! ${fmt(gained)} נקודות` : 'החמצת בשאלה הזו'));
+    } else if (q.status !== 'open' && q.my_answer_id == null) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על השאלה הזו'));
+    }
+    view.append(card);
+  }
+}
+
+// ---------------- Leaderboard ----------------
+async function renderBoard() {
+  $('#hdr').hidden = false;
+  const view = $('#view');
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'טבלת דירוג'), el('div', { className: 'center' }, 'טוען…'));
+  let rows;
+  try { rows = await api('/api/leaderboard'); }
+  catch (e) { toast(e.message, true); return; }
+
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'טבלת דירוג 🏆'));
+  const card = el('div', { className: 'card' });
+  rows.forEach((r, i) => {
+    card.append(el('div', { className: 'lb-row' + (r.id === state.user.id ? ' me' : '') },
+      el('div', { className: 'lb-rank' }, String(i + 1)),
+      el('div', {},
+        el('div', { style: 'font-weight:600' }, r.name),
+        el('div', { className: 'muted' }, `${r.hits} פגיעות · ${r.bets_count} הימורים`),
+      ),
+      el('div', { className: 'lb-score' }, fmt(r.score)),
+    ));
+  });
+  view.append(card);
+  view.append(el('p', { className: 'muted', style: 'text-align:center' }, 'הניקוד = סכום הערכים של התשובות הנכונות שבחרת'));
+}
+
+// ---------------- Admin ----------------
+async function renderAdmin() {
+  $('#hdr').hidden = false;
+  const view = $('#view');
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'ניהול אירועים'), dateBar(renderAdmin), el('div', { className: 'center' }, 'טוען…'));
+
+  let questions;
+  try { questions = await api('/api/admin/questions?date=' + state.date); }
+  catch (e) { toast(e.message, true); return; }
+
+  view.innerHTML = '';
+  view.append(el('h2', {}, 'ניהול · ' + heDate(state.date)), dateBar(renderAdmin));
+
+  // ---- new question form ----
+  const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
+  const ansWrap = el('div', {});
+  const addAnsRow = (t = '', v = '') => {
+    const txt = el('input', { className: 'txt', placeholder: 'תשובה' });
+    txt.value = t;
+    const num = el('input', { className: 'num', type: 'number', step: 'any', placeholder: 'ערך' });
+    num.value = v;
+    const del = el('button', { className: 'btn ghost sm', onclick: () => row.remove() }, '✕');
+    const row = el('div', { className: 'adm-answer' }, txt, num, del);
+    ansWrap.append(row);
+  };
+  addAnsRow(); addAnsRow();
+
+  const createBtn = el('button', { className: 'btn primary grow' }, 'צור אירוע');
+  createBtn.onclick = async () => {
+    const answers = [...ansWrap.querySelectorAll('.adm-answer')].map((r) => ({
+      text: r.querySelector('.txt').value.trim(),
+      value: parseFloat(r.querySelector('.num').value) || 0,
+    })).filter((a) => a.text);
+    try {
+      await api('/api/admin/questions', {
+        method: 'POST',
+        body: { text: qText.value.trim(), event_date: state.date, answers },
+      });
+      toast('האירוע נוצר');
+      renderAdmin();
+    } catch (e) { toast(e.message, true); }
+  };
+
+  view.append(el('div', { className: 'card' },
+    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ אירוע חדש'),
+    qText,
+    el('label', {}, 'תשובות וערכים'),
+    ansWrap,
+    el('div', { className: 'row', style: 'margin:6px 0 12px' },
+      el('button', { className: 'btn ghost sm', onclick: () => addAnsRow() }, '+ תשובה')),
+    el('div', { className: 'row' }, createBtn),
+  ));
+
+  // ---- existing questions ----
+  if (!questions.length) {
+    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה'));
+    return;
+  }
+  for (const q of questions) {
+    const card = el('div', { className: 'card' });
+    card.append(el('div', { className: 'row' },
+      el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
+      el('span', { className: 'pill ' + q.status }, q.status),
+    ));
+
+    // answers with editable value + correct pick
+    for (const a of q.answers) {
+      const num = el('input', { className: 'num', type: 'number', step: 'any', value: a.value });
+      num.onchange = async () => {
+        try { await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } }); toast('עודכן'); }
+        catch (e) { toast(e.message, true); }
+      };
+      const mark = el('button', {
+        className: 'btn sm' + (q.correct_answer_id === a.id ? ' primary' : ' ghost'),
+        onclick: async () => {
+          try {
+            await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } });
+            renderAdmin();
+          } catch (e) { toast(e.message, true); }
+        },
+      }, q.correct_answer_id === a.id ? '✔ נכונה' : 'סמן נכונה');
+      card.append(el('div', { className: 'adm-answer' },
+        el('div', { className: 'grow' }, a.text, el('span', { className: 'muted' }, `  (${a.bet_count} הימורים)`)),
+        num, mark,
+      ));
     }
 
-    document.getElementById('add').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target));
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) { e.target.reset(); load(); }
-      else alert('שגיאה: ' + (await res.json()).error);
-    });
+    card.append(el('hr', { className: 'sep' }));
+    const statusSel = el('select', { style: 'width:auto' });
+    for (const s of ['open', 'closed', 'resolved']) {
+      const o = el('option', { value: s }, { open: 'פתוח', closed: 'סגור להימורים', resolved: 'הוכרע' }[s]);
+      if (s === q.status) o.selected = true;
+      statusSel.append(o);
+    }
+    statusSel.onchange = async () => {
+      try {
+        await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } });
+        toast('סטטוס עודכן');
+        renderAdmin();
+      } catch (e) { toast(e.message, true); statusSel.value = q.status; }
+    };
+    card.append(el('div', { className: 'row' },
+      statusSel,
+      el('div', { className: 'grow' }),
+      el('button', {
+        className: 'btn danger sm',
+        onclick: async () => {
+          if (!confirm('למחוק את האירוע וכל ההימורים עליו?')) return;
+          try { await api('/api/admin/questions/' + q.id, { method: 'DELETE' }); renderAdmin(); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, 'מחק'),
+    ));
+    if (q.status === 'resolved' && !q.correct_answer_id) {
+      card.append(el('div', { className: 'muted', style: 'color:var(--bad);margin-top:6px' }, '⚠ סמן תשובה נכונה כדי לחשב ניקוד'));
+    }
+    view.append(card);
+  }
+}
 
-    load();
-  </script>
+// ---------------- boot ----------------
+function boot() {
+  $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
+  route();
+}
+$('#logoutBtn').onclick = async () => {
+  await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  state.user = null;
+  renderAuth();
+};
+
+(async () => {
+  try {
+    const me = await api('/api/auth/me');
+    if (me) { state.user = me; boot(); } else renderAuth();
+  } catch { renderAuth(); }
+})();
+</script>
 </body>
 </html>
