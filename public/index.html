@@ -402,21 +402,24 @@ async function renderLoginFaces(container) {
 }
 
 function dateBar(onChange) {
+  const today = todayISO();
+  if (state.date > today) state.date = today;
+  const isToday = state.date === today;
   const shift = (days) => {
     const d = new Date(state.date + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    state.date = d.toLocaleDateString('sv-SE');
+    const next = d.toLocaleDateString('sv-SE');
+    if (next > today) return; // no navigating past today
+    state.date = next;
     onChange();
   };
-  const today = todayISO();
-  const isToday = state.date === today;
   return el('div', { className: 'datebar' },
     el('button', { className: 'btn sm', type: 'button', onclick: () => shift(-1) }, '‹ יום קודם'),
     el('button', {
       className: 'btn sm' + (isToday ? ' primary' : ''), type: 'button',
       disabled: isToday, onclick: () => { state.date = today; onChange(); },
     }, 'היום'),
-    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(1) }, 'מחר ›'),
+    el('button', { className: 'btn sm', type: 'button', disabled: isToday, onclick: () => shift(1) }, 'מחר ›'),
   );
 }
 
