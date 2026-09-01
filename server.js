@@ -41,6 +41,7 @@ function setSession(res, userId) {
   res.cookie('sid', signSession(userId), {
     httpOnly: true,
     sameSite: 'lax',
+    secure: !!process.env.VERCEL,
     path: '/',
     maxAge: 30 * 24 * 3600 * 1000,
   });
