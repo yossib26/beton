@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>בטון · קונסולת ניהול</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface-2: #334155; --line: #475569;
+    --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8; --accent-ink: #04222e;
+    --good: #4ade80; --bad: #f87171; --gold: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    background: #020617; color: var(--text); min-height: 100vh;
+  }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--line);
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header .brand { font-weight: 800; letter-spacing: .5px; }
+  header .who { font-size: .8rem; color: var(--muted); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 20px; }
+
+  .tabnav { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .tabnav button {
+    background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--muted); font: inherit; font-weight: 600; padding: 10px 14px; cursor: pointer;
+  }
+  .tabnav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  h2 { font-size: 1.1rem; margin: 0 0 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .grow { flex: 1; }
+  .wrap-row { flex-wrap: wrap; }
+
+  input, select {
+    padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px; color: var(--text); font: inherit; width: 100%;
+  }
+  input::placeholder { color: var(--muted); }
+  label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+
+  button.btn {
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
+  }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.btn.ghost { background: none; }
+  button.btn.danger { color: var(--bad); border-color: var(--bad); background: none; }
+  button.btn.sm { padding: 6px 10px; font-size: .82rem; }
+  button.btn:disabled { opacity: .5; }
+  a.btn { text-decoration: none; display: inline-block; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: start; padding: 10px 8px; border-bottom: 1px solid var(--line); font-size: .9rem; }
+  th { color: var(--muted); font-weight: 600; }
+  td .row { gap: 6px; }
+  .tbl-scroll { overflow-x: auto; }
+
+  .pill { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.open { color: var(--good); border-color: var(--good); }
+  .pill.closed { color: var(--gold); border-color: var(--gold); }
+  .pill.resolved { color: var(--accent); border-color: var(--accent); }
+  .pill.admin { color: var(--gold); border-color: var(--gold); }
+
+  .datebar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .adm-answer { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .adm-answer input.txt { flex: 1; }
+  .adm-answer input.num { width: 90px; text-align: center; }
+  hr.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+  .center { text-align: center; padding: 40px 10px; color: var(--muted); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 10px 16px; border-radius: 999px; font-size: .85rem; z-index: 50;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--bad); color: #fecaca; }
+
+  .gate { max-width: 360px; margin: 60px auto; }
+</style>
+</head>
+<body>
+<header id="hdr" hidden>
+  <div>
+    <div class="brand">בטון · ניהול ⚙️</div>
+    <div class="who" id="who"></div>
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="/">→ לאפליקציה</a>
+    <button class="btn ghost sm" id="logoutBtn" type="button">יציאה</button>
+  </div>
+</header>
+
+<div class="wrap" id="main"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids.flat()) n.append(k?.nodeType ? k : document.createTextNode(k ?? ''));
+  return n;
+};
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, {
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `שגיאה ${res.status}`);
+  return data;
+};
+let toastT;
+const toast = (msg, isErr = false) => {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => (t.className = 'toast'), 2400);
+};
+const fmt = (n) => (n > 0 ? '+' : '') + (Math.round(n * 100) / 100);
+const todayISO = () => new Date().toLocaleDateString('sv-SE');
+const heDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' });
+
+const state = { user: null, tab: 'events', date: todayISO() };
+
+// ---------------- login gate ----------------
+function renderGate(msg) {
+  $('#hdr').hidden = true;
+  const m = $('#main');
+  m.innerHTML = '';
+  const userI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off' });
+  const passI = el('input', { placeholder: 'סיסמה', type: 'password' });
+  const btn = el('button', { className: 'btn primary grow', type: 'button' }, 'כניסת מנהל');
+  btn.onclick = async () => {
+    try {
+      const u = await api('/api/auth/login', { method: 'POST', body: { username: userI.value.trim(), password: passI.value } });
+      if (!u.is_admin) { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); return toast('למשתמש הזה אין הרשאת ניהול', true); }
+      state.user = u;
+      boot();
+    } catch (e) { toast(e.message, true); }
+  };
+  m.append(el('div', { className: 'gate' },
+    el('h2', { style: 'text-align:center' }, 'קונסולת ניהול'),
+    msg ? el('p', { className: 'muted', style: 'text-align:center' }, msg) : '',
+    el('div', { className: 'card' },
+      el('label', {}, 'שם משתמש'), userI,
+      el('label', {}, 'סיסמה'), passI,
+      el('div', { className: 'row', style: 'margin-top:16px' }, btn),
+      el('p', { className: 'muted', style: 'margin-bottom:0' }, 'ברירת מחדל: yossi / beton123'),
+    ),
+  ));
+}
+
+// ---------------- shell ----------------
+function boot() {
+  $('#hdr').hidden = false;
+  $('#who').textContent = state.user.name + ' · מנהל';
+  render();
+}
+$('#logoutBtn').onclick = async () => {
+  await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  state.user = null;
+  renderGate();
+};
+
+function render() {
+  const m = $('#main');
+  m.innerHTML = '';
+  const nav = el('div', { className: 'tabnav' });
+  for (const [id, label] of [['events', 'אירועים'], ['users', 'משתמשים']]) {
+    nav.append(el('button', {
+      className: state.tab === id ? 'active' : '',
+      type: 'button',
+      onclick: () => { state.tab = id; render(); },
+    }, label));
+  }
+  m.append(nav);
+  const body = el('div', { id: 'tabbody' });
+  m.append(body);
+  if (state.tab === 'events') renderEvents(body);
+  else renderUsers(body);
+}
+
+// ---------------- events tab ----------------
+function dateBar(onChange) {
+  const shift = (days) => {
+    const d = new Date(state.date + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    state.date = d.toLocaleDateString('sv-SE');
+    onChange();
+  };
+  const picker = el('input', { type: 'date', value: state.date, style: 'width:auto' });
+  picker.onchange = () => { state.date = picker.value; onChange(); };
+  return el('div', { className: 'datebar' },
+    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(-1) }, '‹ יום קודם'),
+    picker,
+    el('button', { className: 'btn sm', type: 'button', onclick: () => shift(1) }, 'יום הבא ›'),
+  );
+}
+
+async function renderEvents(root) {
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'ניהול אירועים'), dateBar(() => renderEvents(root)), el('div', { className: 'center' }, 'טוען…'));
+
+  let questions;
+  try { questions = await api('/api/admin/questions?date=' + state.date); }
+  catch (e) { toast(e.message, true); return; }
+
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'אירועי ' + heDate(state.date)), dateBar(() => renderEvents(root)));
+
+  // create form
+  const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
+  const ansWrap = el('div', {});
+  const addRow = (t = '', v = '') => {
+    const txt = el('input', { className: 'txt', placeholder: 'תשובה' }); txt.value = t;
+    const num = el('input', { className: 'num', type: 'number', step: 'any', placeholder: 'ערך' }); num.value = v;
+    const row = el('div', { className: 'adm-answer' }, txt, num,
+      el('button', { className: 'btn ghost sm', type: 'button', onclick: () => row.remove() }, '✕'));
+    ansWrap.append(row);
+  };
+  addRow(); addRow();
+  const createBtn = el('button', { className: 'btn primary', type: 'button' }, 'צור אירוע');
+  createBtn.onclick = async () => {
+    const answers = [...ansWrap.querySelectorAll('.adm-answer')].map((r) => ({
+      text: r.querySelector('.txt').value.trim(),
+      value: parseFloat(r.querySelector('.num').value) || 0,
+    })).filter((a) => a.text);
+    try {
+      await api('/api/admin/questions', { method: 'POST', body: { text: qText.value.trim(), event_date: state.date, answers } });
+      toast('האירוע נוצר');
+      renderEvents(root);
+    } catch (e) { toast(e.message, true); }
+  };
+  root.append(el('div', { className: 'card' },
+    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ אירוע חדש'),
+    qText,
+    el('label', {}, 'תשובות וערכים'), ansWrap,
+    el('div', { className: 'row', style: 'margin:6px 0 12px' },
+      el('button', { className: 'btn ghost sm', type: 'button', onclick: () => addRow() }, '+ תשובה')),
+    el('div', { className: 'row' }, createBtn),
+  ));
+
+  if (!questions.length) { root.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה')); return; }
+
+  for (const q of questions) {
+    const card = el('div', { className: 'card' });
+    card.append(el('div', { className: 'row' },
+      el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
+      el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
+    ));
+
+    for (const a of q.answers) {
+      const num = el('input', { className: 'num', type: 'number', step: 'any', value: a.value });
+      num.onchange = async () => {
+        try { await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } }); toast('ערך עודכן'); }
+        catch (e) { toast(e.message, true); }
+      };
+      const mark = el('button', {
+        className: 'btn sm' + (q.correct_answer_id === a.id ? ' primary' : ' ghost'),
+        type: 'button',
+        onclick: async () => {
+          try { await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } }); renderEvents(root); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, q.correct_answer_id === a.id ? '✔ נכונה' : 'סמן נכונה');
+      const del = el('button', {
+        className: 'btn danger sm', type: 'button',
+        onclick: async () => {
+          try { await api('/api/admin/answers/' + a.id, { method: 'DELETE' }); renderEvents(root); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, '✕');
+      card.append(el('div', { className: 'adm-answer' },
+        el('div', { className: 'grow' }, a.text, el('span', { className: 'muted' }, `  (${a.bet_count} הימורים)`)),
+        num, mark, del,
+      ));
+    }
+
+    const addAnsTxt = el('input', { className: 'txt', placeholder: 'תשובה חדשה' });
+    const addAnsNum = el('input', { className: 'num', type: 'number', step: 'any', placeholder: 'ערך' });
+    card.append(el('div', { className: 'adm-answer' }, addAnsTxt, addAnsNum,
+      el('button', {
+        className: 'btn ghost sm', type: 'button',
+        onclick: async () => {
+          if (!addAnsTxt.value.trim()) return;
+          try {
+            await api('/api/admin/questions/' + q.id + '/answers', { method: 'POST', body: { text: addAnsTxt.value.trim(), value: parseFloat(addAnsNum.value) || 0 } });
+            renderEvents(root);
+          } catch (e) { toast(e.message, true); }
+        },
+      }, '+ הוסף')));
+
+    card.append(el('hr', { className: 'sep' }));
+    const statusSel = el('select', { style: 'width:auto' });
+    for (const s of ['open', 'closed', 'resolved']) {
+      const o = el('option', { value: s }, { open: 'פתוח', closed: 'סגור להימורים', resolved: 'הוכרע' }[s]);
+      if (s === q.status) o.selected = true;
+      statusSel.append(o);
+    }
+    statusSel.onchange = async () => {
+      try { await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } }); toast('סטטוס עודכן'); renderEvents(root); }
+      catch (e) { toast(e.message, true); statusSel.value = q.status; }
+    };
+    card.append(el('div', { className: 'row' },
+      statusSel, el('div', { className: 'grow' }),
+      el('button', {
+        className: 'btn danger sm', type: 'button',
+        onclick: async () => {
+          if (!confirm('למחוק את האירוע וכל ההימורים עליו?')) return;
+          try { await api('/api/admin/questions/' + q.id, { method: 'DELETE' }); renderEvents(root); }
+          catch (e) { toast(e.message, true); }
+        },
+      }, 'מחק אירוע'),
+    ));
+    if (q.status === 'resolved' && !q.correct_answer_id) {
+      card.append(el('div', { style: 'color:var(--bad);margin-top:6px', className: 'muted' }, '⚠ סמן תשובה נכונה כדי לחשב ניקוד'));
+    }
+    root.append(card);
+  }
+}
+
+// ---------------- users tab ----------------
+async function renderUsers(root) {
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'ניהול משתמשים'), el('div', { className: 'center' }, 'טוען…'));
+
+  let users;
+  try { users = await api('/api/admin/users'); }
+  catch (e) { toast(e.message, true); return; }
+
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'ניהול משתמשים'));
+
+  // create user
+  const nI = el('input', { placeholder: 'שם מלא' });
+  const uI = el('input', { placeholder: 'שם משתמש', autocapitalize: 'off' });
+  const pI = el('input', { placeholder: 'סיסמה', type: 'text' });
+  const aI = el('input', { type: 'checkbox' });
+  const addBtn = el('button', { className: 'btn primary', type: 'button' }, 'הוסף משתמש');
+  addBtn.onclick = async () => {
+    try {
+      await api('/api/admin/users', { method: 'POST', body: { name: nI.value.trim(), username: uI.value.trim(), password: pI.value, is_admin: aI.checked } });
+      toast('המשתמש נוצר');
+      nI.value = uI.value = pI.value = ''; aI.checked = false;
+      renderUsers(root);
+    } catch (e) { toast(e.message, true); }
+  };
+  root.append(el('div', { className: 'card' },
+    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ משתמש חדש'),
+    el('div', { className: 'row wrap-row' },
+      el('div', { className: 'grow' }, el('label', {}, 'שם'), nI),
+      el('div', { className: 'grow' }, el('label', {}, 'שם משתמש'), uI),
+      el('div', { className: 'grow' }, el('label', {}, 'סיסמה'), pI),
+    ),
+    el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, aI, 'הרשאת ניהול'),
+    el('div', { className: 'row', style: 'margin-top:12px' }, addBtn),
+  ));
+
+  // users table
+  const tbl = el('table');
+  tbl.append(el('tr', {},
+    el('th', {}, '#'), el('th', {}, 'שם'), el('th', {}, 'משתמש'),
+    el('th', {}, 'תפקיד'), el('th', {}, 'הימורים'), el('th', {}, 'פעולות'),
+  ));
+  for (const u of users) {
+    const isMe = u.id === state.user.id;
+    const roleBtn = el('button', {
+      className: 'btn sm ' + (u.is_admin ? 'primary' : 'ghost'),
+      type: 'button',
+      disabled: isMe,
+      onclick: async () => {
+        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { is_admin: !u.is_admin } }); renderUsers(root); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, u.is_admin ? 'מנהל' : 'מהמר');
+    const resetBtn = el('button', {
+      className: 'btn ghost sm', type: 'button',
+      onclick: async () => {
+        const np = prompt('סיסמה חדשה עבור ' + u.username + ':');
+        if (!np) return;
+        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { password: np } }); toast('הסיסמה אופסה'); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, 'איפוס סיסמה');
+    const renameBtn = el('button', {
+      className: 'btn ghost sm', type: 'button',
+      onclick: async () => {
+        const nn = prompt('שם חדש:', u.name);
+        if (!nn || nn.trim() === u.name) return;
+        try { await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { name: nn.trim() } }); renderUsers(root); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, 'שנה שם');
+    const delBtn = el('button', {
+      className: 'btn danger sm', type: 'button', disabled: isMe,
+      onclick: async () => {
+        if (!confirm(`למחוק את ${u.name} וכל ההימורים שלו?`)) return;
+        try { await api('/api/admin/users/' + u.id, { method: 'DELETE' }); renderUsers(root); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, 'מחק');
+    tbl.append(el('tr', {},
+      el('td', {}, String(u.id)),
+      el('td', {}, u.name + (isMe ? ' (אתה)' : '')),
+      el('td', { className: 'muted' }, u.username || '—'),
+      el('td', {}, roleBtn),
+      el('td', { className: 'muted' }, String(u.bets_count)),
+      el('td', {}, el('div', { className: 'row wrap-row' }, renameBtn, resetBtn, delBtn)),
+    ));
+  }
+  root.append(el('div', { className: 'card tbl-scroll' }, tbl));
+}
+
+// ---------------- init ----------------
+(async () => {
+  try {
+    const me = await api('/api/auth/me');
+    if (!me) return renderGate();
+    if (!me.is_admin) return renderGate('החשבון ' + me.name + ' אינו מנהל. התחבר עם חשבון ניהול.');
+    state.user = me;
+    boot();
+  } catch { renderGate(); }
+})();
+</script>
+</body>
+</html>

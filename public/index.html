@@ -196,10 +196,6 @@
   .toast.err { border-color: var(--bad); color: #fecaca; }
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
-  .adm-answer { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-  .adm-answer input.txt { flex: 1; }
-  .adm-answer input.num { width: 74px; text-align: center; }
-  hr.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 
   @media (min-width: 481px) {
     body { align-items: center; padding: 20px 0; background: #020617; }
@@ -215,7 +211,10 @@
       <div class="brand">בטון 🏗️</div>
       <div class="who" id="who"></div>
     </div>
-    <button class="btn ghost sm" id="logoutBtn">יציאה</button>
+    <div class="row" style="gap:6px">
+      <a class="btn ghost sm" id="adminLink" href="/admin.html" hidden>ניהול ⚙️</a>
+      <button class="btn ghost sm" id="logoutBtn">יציאה</button>
+    </div>
   </header>
   <main id="view"></main>
   <nav class="tabs" id="tabs" hidden></nav>
@@ -331,7 +330,6 @@ function renderTabs() {
     { id: 'bets', label: 'הימורים', ico: '🎯' },
     { id: 'board', label: 'טבלה', ico: '🏆' },
   ];
-  if (state.user?.is_admin) defs.push({ id: 'admin', label: 'ניהול', ico: '⚙️' });
   for (const d of defs) {
     tabs.append(el('button', {
       className: state.tab === d.id ? 'active' : '',
@@ -344,7 +342,6 @@ function route() {
   renderTabs();
   if (state.tab === 'bets') renderBets();
   else if (state.tab === 'board') renderBoard();
-  else if (state.tab === 'admin') renderAdmin();
 }
 
 function dateBar(onChange) {
@@ -454,130 +451,11 @@ async function renderBoard() {
   view.append(el('p', { className: 'muted', style: 'text-align:center' }, 'הניקוד = סכום הערכים של התשובות הנכונות שבחרת'));
 }
 
-// ---------------- Admin ----------------
-async function renderAdmin() {
-  $('#hdr').hidden = false;
-  const view = $('#view');
-  view.innerHTML = '';
-  view.append(el('h2', {}, 'ניהול אירועים'), dateBar(renderAdmin), el('div', { className: 'center' }, 'טוען…'));
-
-  let questions;
-  try { questions = await api('/api/admin/questions?date=' + state.date); }
-  catch (e) { toast(e.message, true); return; }
-
-  view.innerHTML = '';
-  view.append(el('h2', {}, 'ניהול · ' + heDate(state.date)), dateBar(renderAdmin));
-
-  // ---- new question form ----
-  const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
-  const ansWrap = el('div', {});
-  const addAnsRow = (t = '', v = '') => {
-    const txt = el('input', { className: 'txt', placeholder: 'תשובה' });
-    txt.value = t;
-    const num = el('input', { className: 'num', type: 'number', step: 'any', placeholder: 'ערך' });
-    num.value = v;
-    const del = el('button', { className: 'btn ghost sm', onclick: () => row.remove() }, '✕');
-    const row = el('div', { className: 'adm-answer' }, txt, num, del);
-    ansWrap.append(row);
-  };
-  addAnsRow(); addAnsRow();
-
-  const createBtn = el('button', { className: 'btn primary grow' }, 'צור אירוע');
-  createBtn.onclick = async () => {
-    const answers = [...ansWrap.querySelectorAll('.adm-answer')].map((r) => ({
-      text: r.querySelector('.txt').value.trim(),
-      value: parseFloat(r.querySelector('.num').value) || 0,
-    })).filter((a) => a.text);
-    try {
-      await api('/api/admin/questions', {
-        method: 'POST',
-        body: { text: qText.value.trim(), event_date: state.date, answers },
-      });
-      toast('האירוע נוצר');
-      renderAdmin();
-    } catch (e) { toast(e.message, true); }
-  };
-
-  view.append(el('div', { className: 'card' },
-    el('div', { style: 'font-weight:700;margin-bottom:8px' }, '➕ אירוע חדש'),
-    qText,
-    el('label', {}, 'תשובות וערכים'),
-    ansWrap,
-    el('div', { className: 'row', style: 'margin:6px 0 12px' },
-      el('button', { className: 'btn ghost sm', onclick: () => addAnsRow() }, '+ תשובה')),
-    el('div', { className: 'row' }, createBtn),
-  ));
-
-  // ---- existing questions ----
-  if (!questions.length) {
-    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה'));
-    return;
-  }
-  for (const q of questions) {
-    const card = el('div', { className: 'card' });
-    card.append(el('div', { className: 'row' },
-      el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
-      el('span', { className: 'pill ' + q.status }, q.status),
-    ));
-
-    // answers with editable value + correct pick
-    for (const a of q.answers) {
-      const num = el('input', { className: 'num', type: 'number', step: 'any', value: a.value });
-      num.onchange = async () => {
-        try { await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } }); toast('עודכן'); }
-        catch (e) { toast(e.message, true); }
-      };
-      const mark = el('button', {
-        className: 'btn sm' + (q.correct_answer_id === a.id ? ' primary' : ' ghost'),
-        onclick: async () => {
-          try {
-            await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } });
-            renderAdmin();
-          } catch (e) { toast(e.message, true); }
-        },
-      }, q.correct_answer_id === a.id ? '✔ נכונה' : 'סמן נכונה');
-      card.append(el('div', { className: 'adm-answer' },
-        el('div', { className: 'grow' }, a.text, el('span', { className: 'muted' }, `  (${a.bet_count} הימורים)`)),
-        num, mark,
-      ));
-    }
-
-    card.append(el('hr', { className: 'sep' }));
-    const statusSel = el('select', { style: 'width:auto' });
-    for (const s of ['open', 'closed', 'resolved']) {
-      const o = el('option', { value: s }, { open: 'פתוח', closed: 'סגור להימורים', resolved: 'הוכרע' }[s]);
-      if (s === q.status) o.selected = true;
-      statusSel.append(o);
-    }
-    statusSel.onchange = async () => {
-      try {
-        await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } });
-        toast('סטטוס עודכן');
-        renderAdmin();
-      } catch (e) { toast(e.message, true); statusSel.value = q.status; }
-    };
-    card.append(el('div', { className: 'row' },
-      statusSel,
-      el('div', { className: 'grow' }),
-      el('button', {
-        className: 'btn danger sm',
-        onclick: async () => {
-          if (!confirm('למחוק את האירוע וכל ההימורים עליו?')) return;
-          try { await api('/api/admin/questions/' + q.id, { method: 'DELETE' }); renderAdmin(); }
-          catch (e) { toast(e.message, true); }
-        },
-      }, 'מחק'),
-    ));
-    if (q.status === 'resolved' && !q.correct_answer_id) {
-      card.append(el('div', { className: 'muted', style: 'color:var(--bad);margin-top:6px' }, '⚠ סמן תשובה נכונה כדי לחשב ניקוד'));
-    }
-    view.append(card);
-  }
-}
 
 // ---------------- boot ----------------
 function boot() {
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
+  $('#adminLink').hidden = !state.user.is_admin;
   route();
 }
 $('#logoutBtn').onclick = async () => {

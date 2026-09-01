@@ -346,10 +346,66 @@ app.delete('/api/admin/answers/:id', requireAdmin, wrap(async (req, res) => {
 }));
 
 app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, name, username, is_admin, created_at FROM users ORDER BY id'
-  );
+  const { rows } = await pool.query(`
+    SELECT u.id, u.name, u.username, u.is_admin, u.created_at,
+           COUNT(b.id)::int AS bets_count
+      FROM users u
+      LEFT JOIN bets b ON b.user_id = u.id
+     GROUP BY u.id
+     ORDER BY u.id
+  `);
   res.json(rows);
+}));
+
+app.post('/api/admin/users', requireAdmin, wrap(async (req, res) => {
+  const name = (req.body?.name || '').trim();
+  const username = (req.body?.username || '').trim();
+  const password = req.body?.password || '';
+  const isAdmin = !!req.body?.is_admin;
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'שם, שם משתמש וסיסמה נדרשים' });
+  }
+  if (password.length < 4) return res.status(400).json({ error: 'סיסמה קצרה מדי (לפחות 4 תווים)' });
+  const taken = await pool.query('SELECT 1 FROM users WHERE lower(username) = lower($1)', [username]);
+  if (taken.rows.length) return res.status(409).json({ error: 'שם המשתמש תפוס' });
+  const { rows } = await pool.query(
+    `INSERT INTO users (name, username, password_hash, is_admin) VALUES ($1, $2, $3, $4)
+     RETURNING id, name, username, is_admin, created_at`,
+    [name, username, hashPassword(password), isAdmin]
+  );
+  res.status(201).json({ ...rows[0], bets_count: 0 });
+}));
+
+app.patch('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const name = req.body?.name != null ? String(req.body.name).trim() : null;
+  const password = req.body?.password || null;
+  const isAdmin = req.body?.is_admin;
+  if (id === req.user.id && isAdmin === false) {
+    return res.status(400).json({ error: 'אי אפשר להסיר לעצמך הרשאת ניהול' });
+  }
+  if (password != null && password.length < 4) {
+    return res.status(400).json({ error: 'סיסמה קצרה מדי (לפחות 4 תווים)' });
+  }
+  const { rows } = await pool.query(
+    `UPDATE users SET
+        name = COALESCE($2, name),
+        is_admin = COALESCE($3, is_admin),
+        password_hash = COALESCE($4, password_hash)
+      WHERE id = $1
+      RETURNING id, name, username, is_admin, created_at`,
+    [id, name, typeof isAdmin === 'boolean' ? isAdmin : null, password ? hashPassword(password) : null]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'משתמש לא נמצא' });
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.user.id) return res.status(400).json({ error: 'אי אפשר למחוק את המשתמש שלך' });
+  const r = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+  if (!r.rowCount) return res.status(404).json({ error: 'משתמש לא נמצא' });
+  res.json({ deleted: r.rowCount });
 }));
 
 // --- static -----------------------------------------------------------
