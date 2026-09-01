@@ -229,9 +229,13 @@ async function renderEvents(root) {
   root.innerHTML = '';
   root.append(el('h2', {}, 'ניהול אירועים'), dateBar(() => renderEvents(root)), el('div', { className: 'center' }, 'טוען…'));
 
-  let questions;
-  try { questions = await api('/api/admin/questions?date=' + state.date); }
-  catch (e) { toast(e.message, true); return; }
+  let questions, standings;
+  try {
+    [questions, standings] = await Promise.all([
+      api('/api/admin/questions?date=' + state.date),
+      api('/api/leaderboard').catch(() => []),
+    ]);
+  } catch (e) { toast(e.message, true); return; }
 
   root.innerHTML = '';
   root.append(el('h2', {}, 'אירועי ' + heDate(state.date)), dateBar(() => renderEvents(root)));
@@ -242,6 +246,26 @@ async function renderEvents(root) {
       '📅 יום שעבר — אפשר להכריע ולערוך אירועים קיימים, אך לא להוסיף אירוע חדש. ' +
       'הוספת אירוע אפשרית להיום או לימים קדימה בלבד.'));
   }
+
+  // live standings — recomputed from every resolved event on each load
+  const standCard = el('div', { className: 'card' });
+  standCard.append(el('div', { className: 'row', style: 'font-weight:700;margin-bottom:6px' },
+    el('div', { className: 'grow' }, '🏆 דירוג מעודכן'),
+    el('button', { className: 'btn ghost sm', type: 'button', onclick: () => renderEvents(root) }, '⟳ חשב מחדש'),
+  ));
+  if (!standings.length) {
+    standCard.append(el('div', { className: 'muted' }, 'אין נתונים עדיין'));
+  } else {
+    standings.forEach((r, i) => {
+      standCard.append(el('div', { className: 'row', style: 'padding:5px 0;border-top:1px solid var(--line)' },
+        el('div', { className: 'muted', style: 'width:20px' }, String(i + 1)),
+        el('div', { className: 'grow' }, r.name),
+        el('div', { className: 'muted', style: 'font-size:.8rem' }, `${r.hits} פגיעות`),
+        el('div', { style: 'font-weight:800;font-variant-numeric:tabular-nums;width:52px;text-align:left' }, fmt(r.score)),
+      ));
+    });
+  }
+  root.append(standCard);
 
   // create form
   const qText = el('input', { placeholder: 'שאלת האירוע (למשל: מי יבקיע ראשון?)' });
@@ -289,16 +313,22 @@ async function renderEvents(root) {
     for (const a of q.answers) {
       const num = el('input', { className: 'num', type: 'number', step: 'any', value: a.value });
       num.onchange = async () => {
-        try { await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } }); toast('ערך עודכן'); }
-        catch (e) { toast(e.message, true); }
+        try {
+          await api('/api/admin/answers/' + a.id, { method: 'PATCH', body: { value: parseFloat(num.value) || 0 } });
+          toast('ערך עודכן — הניקוד חושב מחדש');
+          renderEvents(root);
+        } catch (e) { toast(e.message, true); }
       };
       const mark = el('button', {
         className: 'btn sm' + (q.correct_answer_id === a.id ? ' primary' : ' ghost'),
         type: 'button',
         disabled: !isPast,
         onclick: async () => {
-          try { await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } }); renderEvents(root); }
-          catch (e) { toast(e.message, true); }
+          try {
+            await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { correct_answer_id: a.id } });
+            toast('✓ התשובה עודכנה — הניקוד חושב מחדש');
+            renderEvents(root);
+          } catch (e) { toast(e.message, true); }
         },
       }, q.correct_answer_id === a.id ? '✔ נכונה' : 'סמן נכונה');
       const del = el('button', {
@@ -337,8 +367,11 @@ async function renderEvents(root) {
       statusSel.append(o);
     }
     statusSel.onchange = async () => {
-      try { await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } }); toast('סטטוס עודכן'); renderEvents(root); }
-      catch (e) { toast(e.message, true); statusSel.value = q.status; }
+      try {
+        await api('/api/admin/questions/' + q.id, { method: 'PATCH', body: { status: statusSel.value } });
+        toast(statusSel.value === 'resolved' ? 'הוכרע — הניקוד חושב מחדש' : 'סטטוס עודכן');
+        renderEvents(root);
+      } catch (e) { toast(e.message, true); statusSel.value = q.status; }
     };
     card.append(el('div', { className: 'row' },
       statusSel, el('div', { className: 'grow' }),
