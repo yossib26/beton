@@ -179,11 +179,21 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   res.json(saved.rows[0]);
 }));
 
-// --- roster (public: names shown on the login page) ----------------
+// --- roster (public: names + score shown on the login page) --------
 app.get('/api/users', wrap(async (_req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, name, is_admin FROM users ORDER BY id'
-  );
+  const { rows } = await pool.query(`
+    SELECT u.id, u.name, u.is_admin,
+           COALESCE(SUM(
+             CASE WHEN q.status = 'resolved' AND b.answer_id = q.correct_answer_id
+                  THEN a.value ELSE 0 END
+           ), 0)::float8 AS score
+      FROM users u
+      LEFT JOIN bets b ON b.user_id = u.id
+      LEFT JOIN questions q ON q.id = b.question_id
+      LEFT JOIN answers a ON a.id = b.answer_id
+     GROUP BY u.id
+     ORDER BY u.id
+  `);
   res.json(rows);
 }));
 

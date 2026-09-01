@@ -199,8 +199,8 @@
 
   /* comic strip of every user in the system, top of the login page */
   .faces {
-    display: flex; flex-wrap: wrap; justify-content: center;
-    gap: 12px 16px; padding: 18px 8px 6px; min-height: 40px;
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
+    gap: 10px 14px; padding: 18px 8px 6px; min-height: 40px;
   }
   .face-chip {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -209,7 +209,7 @@
     animation-delay: var(--pop, 0s), var(--delay, 0s);
   }
   .face-chip .face {
-    font-size: 1.9rem; line-height: 1;
+    font-size: var(--size, 1.9rem); line-height: 1;
     transform: rotate(var(--tilt, 0deg));
     filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));
   }
@@ -219,7 +219,8 @@
     padding: 1px 6px; border-radius: 999px;
     max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .face-chip.admin .tag { color: var(--gold); border-color: var(--gold); }
+  .face-chip.leader .face { filter: drop-shadow(0 0 10px rgba(251,191,36,.7)); }
+  .face-chip.leader .tag { color: var(--gold); border-color: var(--gold); }
   @keyframes crowd-bob {
     0%, 100% { transform: translateY(0) rotate(-3deg); }
     50%      { transform: translateY(-9px) rotate(3deg); }
@@ -388,19 +389,31 @@ async function renderLoginFaces(container) {
   let users;
   try { users = await api('/api/users'); } catch { return; }
   container.innerHTML = '';
-  users.forEach((u) => {
+
+  // size by leaderboard rank (leader biggest + crown), display in random order
+  const rankById = new Map(
+    [...users].sort((a, b) => b.score - a.score).map((u, i) => [u.id, i])
+  );
+  const n = users.length;
+  const shuffled = users.map((u) => u).sort(() => Math.random() - 0.5);
+
+  shuffled.forEach((u) => {
+    const rank = rankById.get(u.id);
+    const t = n > 1 ? rank / (n - 1) : 0;           // 0 = leader … 1 = last
+    const size = (3.1 - t * 1.9).toFixed(2);        // rem: 3.1 → 1.2
+    const isLeader = rank === 0;
     const dur = (3 + seeded(u.id * 5 + 4) * 3).toFixed(2);
     const delay = (seeded(u.id * 11 + 6) * -6).toFixed(2);
-    const pop = (seeded(u.id * 19 + 3) * 0.6).toFixed(2);
+    const pop = (Math.random() * 0.6).toFixed(2);
     const tilt = Math.round(seeded(u.id * 13 + 8) * 20 - 10);
     const face = CROWD_FACES[Math.floor(seeded(u.id * 17 + 9) * CROWD_FACES.length)];
     container.append(el('div', {
-      className: 'face-chip' + (u.is_admin ? ' admin' : ''),
-      style: `--dur:${dur}s;--delay:${delay}s;--pop:${pop}s;--tilt:${tilt}deg`,
-      title: u.name,
+      className: 'face-chip' + (isLeader ? ' leader' : ''),
+      style: `--size:${size}rem;--dur:${dur}s;--delay:${delay}s;--pop:${pop}s;--tilt:${tilt}deg`,
+      title: `${u.name} · ${fmt(u.score)} נק'`,
     },
       el('div', { className: 'face' }, face),
-      el('div', { className: 'tag' }, (u.is_admin ? '👑 ' : '') + u.name),
+      el('div', { className: 'tag' }, (isLeader ? '👑 ' : '') + u.name),
     ));
   });
 }
