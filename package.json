@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "db:init": "node db/init.js",
-    "db:seed-demo": "node db/seed-demo.js"
+    "db:seed-demo": "node db/seed-demo.js",
+    "db:seed-demo-past": "node db/seed-demo.js --past"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

@@ -1,19 +1,28 @@
-// Seed demo questions: 3 per day, 10 days forward from today.
-// All demo question texts are prefixed with "[דמו] " so a re-run replaces only demo rows.
+// Seed demo questions. Demo texts are prefixed with "[דמו] " so a re-run
+// replaces only the demo rows in the same time window (future or past).
+//
+//   node db/seed-demo.js                 -> 10 days forward, 3/day (30), status open
+//   node db/seed-demo.js --past          -> 10 days back,    2/day (20), status resolved
+//   node db/seed-demo.js --days 5 --per-day 2 --past
 import { pool } from './pool.js';
 
-const DAYS = 10;
-const PER_DAY = 3;
+const args = process.argv.slice(2);
+const past = args.includes('--past');
+const argVal = (name, def) => {
+  const i = args.indexOf('--' + name);
+  return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def;
+};
+
+const DAYS = argVal('days', 10);
+const PER_DAY = argVal('per-day', past ? 2 : 3);
 const PREFIX = '[דמו] ';
 
 const TEAMS = [
   'הפועל ת"א', 'מכבי חיפה', 'בית"ר ירושלים', 'מכבי ת"א', 'הפועל באר שבע',
   'בני סכנין', 'הפועל חיפה', 'מ.ס אשדוד', 'מכבי נתניה', 'הפועל ירושלים',
 ];
-
 const pair = (i) => [TEAMS[i % TEAMS.length], TEAMS[(i + 3) % TEAMS.length]];
 
-// three question generators, one used per slot each day
 const generators = [
   (a, b) => ({
     text: `${a} מול ${b} — מה תהיה התוצאה?`,
@@ -46,40 +55,54 @@ async function main() {
     await client.query('BEGIN');
 
     const del = await client.query(
-      `DELETE FROM questions WHERE text LIKE $1 AND event_date >= CURRENT_DATE`,
+      `DELETE FROM questions
+        WHERE text LIKE $1
+          AND event_date ${past ? '< CURRENT_DATE' : '>= CURRENT_DATE'}`,
       [PREFIX + '%']
     );
-    console.log(`removed ${del.rowCount} existing demo questions (today onward)`);
+    console.log(`removed ${del.rowCount} existing demo questions (${past ? 'past' : 'today onward'})`);
 
     let created = 0;
     for (let d = 0; d < DAYS; d++) {
+      const dayOffset = past ? -(d + 1) : d; // past: yesterday .. -DAYS
       for (let s = 0; s < PER_DAY; s++) {
         const idx = d * PER_DAY + s;
         const [a, b] = pair(idx);
-        const g = generators[s % generators.length](a, b);
+        const g = generators[(past ? idx : s) % generators.length](a, b);
 
         const qr = await client.query(
-          `INSERT INTO questions (event_date, text, position)
-           VALUES (CURRENT_DATE + $1::int, $2, $3)
+          `INSERT INTO questions (event_date, text, status, position)
+           VALUES (CURRENT_DATE + $1::int, $2, $3, $4)
            RETURNING id`,
-          [d, PREFIX + g.text, s]
+          [dayOffset, PREFIX + g.text, past ? 'resolved' : 'open', s]
         );
         const qid = qr.rows[0].id;
+
+        const answerIds = [];
         for (let i = 0; i < g.answers.length; i++) {
-          await client.query(
-            `INSERT INTO answers (question_id, text, value, position) VALUES ($1, $2, $3, $4)`,
+          const ar = await client.query(
+            `INSERT INTO answers (question_id, text, value, position)
+             VALUES ($1, $2, $3, $4) RETURNING id`,
             [qid, g.answers[i].text, g.answers[i].value, i]
           );
+          answerIds.push(ar.rows[0].id);
+        }
+
+        if (past) {
+          // deterministic "correct" answer so the leaderboard has data
+          const correct = answerIds[(idx * 7 + 2) % answerIds.length];
+          await client.query('UPDATE questions SET correct_answer_id = $1 WHERE id = $2', [correct, qid]);
         }
         created++;
       }
     }
 
     await client.query('COMMIT');
-    console.log(`created ${created} demo questions across ${DAYS} days (${PER_DAY}/day)`);
+    console.log(`created ${created} demo questions across ${DAYS} days (${PER_DAY}/day, status ${past ? 'resolved' : 'open'})`);
 
     const summary = await pool.query(
-      `SELECT event_date, COUNT(*)::int AS questions
+      `SELECT event_date, COUNT(*)::int AS questions,
+              MIN(status) AS status
          FROM questions WHERE text LIKE $1
         GROUP BY event_date ORDER BY event_date`,
       [PREFIX + '%']

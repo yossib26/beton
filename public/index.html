@@ -344,19 +344,27 @@ function route() {
   else if (state.tab === 'board') renderBoard();
 }
 
-function dateBar(onChange) {
+function dateBar(onChange, { maxDate } = {}) {
+  if (maxDate && state.date > maxDate) state.date = maxDate;
   const shift = (days) => {
     const d = new Date(state.date + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    state.date = d.toLocaleDateString('sv-SE');
+    const next = d.toLocaleDateString('sv-SE');
+    if (maxDate && next > maxDate) return;
+    state.date = next;
     onChange();
   };
   const picker = el('input', { type: 'date', value: state.date, style: 'width:auto' });
-  picker.onchange = () => { state.date = picker.value; onChange(); };
+  if (maxDate) picker.max = maxDate;
+  picker.onchange = () => {
+    state.date = maxDate && picker.value > maxDate ? maxDate : picker.value;
+    onChange();
+  };
+  const atMax = maxDate && state.date >= maxDate;
   return el('div', { className: 'datebar' },
     el('button', { className: 'btn sm', onclick: () => shift(-1) }, '‹ אתמול'),
     picker,
-    el('button', { className: 'btn sm', onclick: () => shift(1) }, 'מחר ›'),
+    el('button', { className: 'btn sm', disabled: atMax, onclick: () => shift(1) }, 'מחר ›'),
   );
 }
 
@@ -365,14 +373,14 @@ async function renderBets() {
   $('#hdr').hidden = false;
   const view = $('#view');
   view.innerHTML = '';
-  view.append(el('h2', {}, 'אירועי היום'), dateBar(renderBets), el('div', { className: 'center' }, 'טוען…'));
+  view.append(el('h2', {}, 'אירועי היום'), dateBar(renderBets, { maxDate: todayISO() }), el('div', { className: 'center' }, 'טוען…'));
   let questions;
   try {
     questions = await api('/api/questions?date=' + state.date);
   } catch (e) { toast(e.message, true); return; }
 
   view.innerHTML = '';
-  view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets));
+  view.append(el('h2', {}, 'אירועים · ' + heDate(state.date)), dateBar(renderBets, { maxDate: todayISO() }));
 
   if (!questions.length) {
     view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'));

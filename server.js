@@ -158,7 +158,7 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
     return res.status(400).json({ error: 'question_id ו-answer_id נדרשים' });
   }
   const { rows } = await pool.query(
-    `SELECT q.status, a.id AS answer_ok
+    `SELECT q.status, (q.event_date > CURRENT_DATE) AS is_future, a.id AS answer_ok
        FROM questions q
        LEFT JOIN answers a ON a.id = $2 AND a.question_id = q.id
       WHERE q.id = $1`,
@@ -166,6 +166,7 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   );
   if (!rows.length) return res.status(404).json({ error: 'שאלה לא נמצאה' });
   if (!rows[0].answer_ok) return res.status(400).json({ error: 'התשובה לא שייכת לשאלה' });
+  if (rows[0].is_future) return res.status(409).json({ error: 'לא ניתן להמר על אירוע של יום עתידי' });
   if (rows[0].status !== 'open') return res.status(409).json({ error: 'ההימור על השאלה נסגר' });
 
   const saved = await pool.query(

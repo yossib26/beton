@@ -21,6 +21,13 @@ npm start                 # http://127.0.0.1:8000
 
 משתמשי דמו: `yossi/beton123` (מנהל), `dana/beton123`, `avi/beton123`.
 
+נתוני דמו (אופציונלי):
+
+```bash
+npm run db:seed-demo        # 3 שאלות/יום, 10 ימים קדימה, פתוחות
+npm run db:seed-demo-past   # 2 שאלות/יום, 10 ימים אחורה, מוכרעות
+```
+
 ## מודל הנתונים
 
 - **users** – מהמרים. כניסה עם `username` + `password` (scrypt). `is_admin` לניהול.
@@ -28,6 +35,7 @@ npm start                 # http://127.0.0.1:8000
   `correct_answer_id` נקבע בהכרעה.
 - **answers** – תשובות ברמת השאלה, לכל אחת `value` מספרי.
 - **bets** – בחירה אחת למשתמש לכל שאלה (upsert). ניתן לשנות כל עוד השאלה `open`.
+  אין הימור על אירוע של יום עתידי (נחסם בשרת, וניווט לימים הבאים מנוטרל באפליקציה).
 
 ניקוד מהמר = `SUM(answers.value)` על שאלות `resolved` שבהן `bet.answer_id = correct_answer_id`.
 
