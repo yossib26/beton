@@ -198,15 +198,19 @@
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
-  /* screen that pins the login card to the bottom */
+  /* login: fill exactly one screen, no scroll */
+  body.auth-mode main { padding-bottom: 16px; }
+  body.auth-mode #view { display: flex; flex-direction: column; }
   .auth-screen {
-    min-height: calc(100vh - 128px);
-    display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
   }
   /* comic strip of every user in the system, top of the login page */
   .faces {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
-    gap: 14px 18px; padding: 16px 8px 4px; min-height: 40px;
+    align-content: flex-start;
+    gap: 12px 16px; padding: 26px 8px 4px; min-height: 40px;
+    max-height: 48vh; overflow: hidden;
   }
   .face-chip {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -302,6 +306,7 @@ const state = { user: null, tab: 'bets', date: todayISO() };
 
 // ---------------- Auth screen ----------------
 function renderAuth() {
+  document.body.classList.add('auth-mode');
   $('#hdr').hidden = true;
   $('#tabs').hidden = true;
   $('#logoutBtn').hidden = true;
@@ -387,7 +392,7 @@ async function renderLoginFaces(container) {
   shuffled.forEach((u) => {
     const rank = rankById.get(u.id);
     const t = n > 1 ? rank / (n - 1) : 0;           // 0 = leader … 1 = last
-    const size = (4.8 - t * 2.4).toFixed(2);        // rem: 4.8 → 2.4
+    const size = (4.0 - t * 2.0).toFixed(2);        // rem: 4.0 → 2.0
     const isLeader = rank === 0;
     const dur = (3 + seeded(u.id * 5 + 4) * 3).toFixed(2);
     const delay = (seeded(u.id * 11 + 6) * -6).toFixed(2);
@@ -535,6 +540,7 @@ async function renderBoard() {
 
 // ---------------- boot ----------------
 function boot() {
+  document.body.classList.remove('auth-mode');
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
   $('#logoutBtn').hidden = false;
   route();
