@@ -64,6 +64,12 @@ const wrap = (fn) => (req, res) =>
     if (!res.headersSent) res.status(500).json({ error: 'שגיאת שרת' });
   });
 
+// Start of the current betting window: the most recent Friday strictly before
+// today. On Saturday that is yesterday; on any other day it is the previous
+// week's Friday. Used for the roster icon crowd and the admin stats page.
+const WINDOW_START_SQL =
+  '(CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1))';
+
 // --- health / diagnostics ----------------------------------------------
 app.get('/api/health', async (_req, res) => {
   const url = process.env.DATABASE_URL || '';
@@ -197,7 +203,9 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
 }));
 
 // --- roster (public: bettor names + score shown on the login page) --
-// admins are management accounts, not participants — excluded here
+// admins are management accounts, not participants — excluded here.
+// score covers the current betting window only (see WINDOW_START_SQL),
+// so the icon crowd reflects this round and resets each Saturday.
 app.get('/api/users', wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT u.id, u.name, u.is_admin, u.icon,
@@ -207,6 +215,8 @@ app.get('/api/users', wrap(async (_req, res) => {
            ), 0)::float8 AS score
       FROM users u
       LEFT JOIN bets b ON b.user_id = u.id
+        AND b.event_date >= ${WINDOW_START_SQL}
+        AND b.event_date <= CURRENT_DATE
       LEFT JOIN questions q ON q.id = b.question_id
       LEFT JOIN answers a ON a.id = b.answer_id
      WHERE u.is_admin = false AND u.active = true
@@ -442,8 +452,7 @@ app.get('/api/admin/bets', requireAdmin, wrap(async (_req, res) => {
 app.get('/api/admin/stats', requireAdmin, wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     WITH win AS (
-      SELECT (CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1)) AS start_date,
-             CURRENT_DATE AS end_date
+      SELECT ${WINDOW_START_SQL} AS start_date, CURRENT_DATE AS end_date
     )
     SELECT u.id, u.name, u.username, u.icon,
            COUNT(b.id)::int AS bets,
@@ -471,8 +480,7 @@ app.get('/api/admin/stats', requireAdmin, wrap(async (_req, res) => {
      ORDER BY score DESC, hits DESC, u.name ASC
   `);
   const range = (await pool.query(`
-    SELECT (CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1))::text AS start_date,
-           CURRENT_DATE::text AS end_date
+    SELECT ${WINDOW_START_SQL}::text AS start_date, CURRENT_DATE::text AS end_date
   `)).rows[0];
   res.json({ range, rows });
 }));
