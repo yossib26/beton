@@ -64,11 +64,12 @@ const wrap = (fn) => (req, res) =>
     if (!res.headersSent) res.status(500).json({ error: 'שגיאת שרת' });
   });
 
-// Start of the current betting window: the most recent Friday strictly before
-// today. On Saturday that is yesterday; on any other day it is the previous
-// week's Friday. Used for the roster icon crowd and the admin stats page.
+// Start of the current betting window: the Friday of the previous week
+// (weeks run Sun–Sat), inclusive — regardless of today's weekday. It is
+// stable Sun-through-Sat and advances by a week each Sunday. Used for the
+// roster icon crowd and the admin stats page.
 const WINDOW_START_SQL =
-  '(CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1))';
+  '(CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int - 2)';
 
 // --- health / diagnostics ----------------------------------------------
 app.get('/api/health', async (_req, res) => {
@@ -205,7 +206,7 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
 // --- roster (public: bettor names + score shown on the login page) --
 // admins are management accounts, not participants — excluded here.
 // score covers the current betting window only (see WINDOW_START_SQL),
-// so the icon crowd reflects this round and resets each Saturday.
+// so the icon crowd reflects this round and rolls over each Sunday.
 app.get('/api/users', wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT u.id, u.name, u.is_admin, u.icon,
@@ -446,9 +447,8 @@ app.get('/api/admin/bets', requireAdmin, wrap(async (_req, res) => {
   res.json(rows);
 }));
 
-// bettor stats for the current betting window: from the most recent Friday
-// strictly before today, through today. On Saturday that Friday is yesterday;
-// on any other day it is the previous week's Friday.
+// bettor stats for the current betting window: from the previous week's
+// Friday (inclusive) through today, regardless of today's weekday.
 app.get('/api/admin/stats', requireAdmin, wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     WITH win AS (
