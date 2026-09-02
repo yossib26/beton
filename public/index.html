@@ -496,7 +496,7 @@ async function renderBets() {
   }
 
   if (!questions.length) {
-    view.append(el('div', { className: 'center' }, 'אין אירוע ליום הזה 🤷'), tipCard());
+    view.append(el('div', { className: 'center' }, 'אין אירוע ליום הזה 🤷'), tipCard(), crowdStrip());
     return;
   }
 
@@ -506,7 +506,7 @@ async function renderBets() {
 
   const showResults = !isToday; // today: show only the chosen bet, never results
   const slot = el('div', { className: 'bet-slot' });
-  view.append(slot, tipCard());
+  view.append(slot, tipCard(), crowdStrip());
 
   const paint = () => {
     slot.innerHTML = '';
@@ -576,6 +576,15 @@ function tipCard() {
   api('/api/daily-tip')
     .then((r) => { if (r?.text) card.querySelector('.tip-text').textContent = r.text; else wrap.remove(); })
     .catch(() => wrap.remove());
+  return wrap;
+}
+
+// the user crowd (same rank-sized icons as the login page)
+function crowdStrip() {
+  const wrap = el('div', { style: 'max-width:720px;margin:16px auto 0' });
+  const faces = el('div', { className: 'faces' });
+  wrap.append(faces);
+  renderLoginFaces(faces);
   return wrap;
 }
 
