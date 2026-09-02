@@ -174,7 +174,10 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
       [req.user.id, questionId, answerId, rows[0].event_date]
     );
     await client.query('COMMIT');
-    const msg = await pool.query('SELECT text FROM bet_messages ORDER BY random() LIMIT 1');
+    // reuse `client` (not pool.query): on Vercel the pool is capped at 1
+    // connection, so asking the pool for another one here would deadlock
+    // against the client we still hold until the finally block.
+    const msg = await client.query('SELECT text FROM bet_messages ORDER BY random() LIMIT 1');
     let message = msg.rows[0]?.text ?? null;
     if (message) {
       message = message.includes('{name}')
