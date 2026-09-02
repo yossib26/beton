@@ -227,7 +227,7 @@ app.get('/api/users', wrap(async (_req, res) => {
   res.json(rows);
 }));
 
-// --- leaderboard ------------------------------------------------------
+// --- leaderboard (current betting window, same as WINDOW_START_SQL) ----
 app.get('/api/leaderboard', requireAuth, wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT u.id, u.name, u.username,
@@ -239,13 +239,18 @@ app.get('/api/leaderboard', requireAuth, wrap(async (_req, res) => {
            COUNT(*) FILTER (WHERE q.status = 'resolved' AND b.answer_id = q.correct_answer_id)::int AS hits
       FROM users u
       LEFT JOIN bets b ON b.user_id = u.id
+        AND b.event_date >= ${WINDOW_START_SQL}
+        AND b.event_date <= CURRENT_DATE
       LEFT JOIN questions q ON q.id = b.question_id
       LEFT JOIN answers a ON a.id = b.answer_id
-     WHERE u.is_admin = false
+     WHERE u.is_admin = false AND u.active = true
      GROUP BY u.id
      ORDER BY score DESC, hits DESC, u.name ASC
   `);
-  res.json(rows);
+  const range = (await pool.query(`
+    SELECT ${WINDOW_START_SQL}::text AS start_date, CURRENT_DATE::text AS end_date
+  `)).rows[0];
+  res.json({ range, rows });
 }));
 
 // --- admin -----------------------------------------------------------

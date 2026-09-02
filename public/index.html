@@ -591,13 +591,17 @@ async function renderBoard() {
   const view = $('#view');
   view.innerHTML = '';
   view.append(el('h2', {}, 'טבלת דירוג'), el('div', { className: 'center' }, 'טוען…'));
-  let rows;
-  try { rows = await api('/api/leaderboard'); }
+  let rows, range;
+  try { ({ rows, range } = await api('/api/leaderboard')); }
   catch (e) { toast(e.message, true); return; }
 
   view.innerHTML = '';
   const wrap = el('div', { className: 'bet-slot' });
   wrap.append(el('h2', {}, 'טבלת דירוג 🏆'));
+  if (range) {
+    wrap.append(el('div', { className: 'muted', style: 'text-align:center;margin:-4px 0 10px' },
+      `הדירוג השבועי · ${heDate(range.start_date)} – ${heDate(range.end_date)}`));
+  }
   const card = el('div', { className: 'card' });
   rows.forEach((r, i) => {
     card.append(el('div', { className: 'lb-row' + (r.id === state.user.id ? ' me' : '') },
