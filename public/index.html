@@ -29,13 +29,14 @@
   }
   #app {
     width: 100%;
-    max-width: 480px;
+    max-width: 860px;
     min-height: 100vh;
     background: var(--bg);
     display: flex;
     flex-direction: column;
     position: relative;
   }
+  body.auth-mode #app { max-width: 480px; }
   header {
     padding: 14px 16px;
     background: var(--surface);
@@ -53,8 +54,10 @@
   nav.tabs {
     position: fixed;
     bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
     width: 100%;
-    max-width: 480px;
+    max-width: 860px;
     display: flex;
     background: var(--surface);
     border-top: 1px solid var(--line);
@@ -198,6 +201,14 @@
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
+  /* wide layout: events flow into columns as the page gets wider */
+  .cards-grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
+  }
+  .card.bet-here { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
   /* login: fill exactly one screen, no scroll */
   body.auth-mode main { padding-bottom: 16px; }
   body.auth-mode #view { display: flex; flex-direction: column; }
@@ -248,9 +259,9 @@
   }
 
   @media (min-width: 481px) {
-    body { align-items: center; padding: 20px 0; background: #020617; }
-    #app { border-radius: 22px; overflow: hidden; min-height: min(880px, 92vh); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
-    nav.tabs { position: sticky; }
+    body { align-items: flex-start; justify-content: center; padding: 20px 0; background: #020617; }
+    #app { border-radius: 22px; min-height: calc(100vh - 40px); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+    body.auth-mode #app { overflow: hidden; min-height: min(760px, 92vh); }
   }
 </style>
 </head>
@@ -459,10 +470,30 @@ async function renderBets() {
   }
 
   const showResults = !isToday; // today: show only the chosen bet, never results
+  if (isToday) {
+    view.append(el('div', { className: 'card muted' },
+      '🎯 הימור אחד ליום — בחר תשובה באחד מאירועי היום. לחיצה על אירוע אחר תעביר את ההימור.'));
+  }
 
-  // one question card; picking a bet updates local state and swaps this card only
+  const grid = el('div', { className: 'cards-grid' });
+  view.append(grid, logoutFooter());
+
+  const dayBetQid = () => {
+    const q = questions.find((x) => x.my_bet_question_id != null);
+    return q ? q.my_bet_question_id : null;
+  };
+
+  const paint = () => {
+    grid.innerHTML = '';
+    for (const q of questions) grid.append(buildCard(q));
+  };
+
   const buildCard = (q) => {
-    const card = el('div', { className: 'card' });
+    const betQid = dayBetQid();
+    const betHere = betQid === q.id;
+    const betElsewhere = betQid != null && !betHere;
+
+    const card = el('div', { className: 'card' + (betHere ? ' bet-here' : '') });
     card.append(el('div', { className: 'row' },
       el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
       el('span', { className: 'pill ' + q.status }, { open: 'פתוח', closed: 'סגור', resolved: 'הוכרע' }[q.status]),
@@ -470,7 +501,7 @@ async function renderBets() {
 
     const box = el('div', { className: 'answers' });
     for (const a of q.answers) {
-      const picked = q.my_answer_id === a.id;
+      const picked = betHere && q.my_answer_id === a.id;
       const isCorrect = showResults && q.status === 'resolved' && q.correct_answer_id === a.id;
       const wrongPick = showResults && q.status === 'resolved' && picked && !isCorrect;
       const btn = el('button', {
@@ -482,17 +513,24 @@ async function renderBets() {
       );
       if (q.status === 'open' && isToday) {
         btn.onclick = async () => {
-          const prev = q.my_answer_id;
-          if (prev === a.id) return;
-          q.my_answer_id = a.id;              // optimistic
-          card.replaceWith(buildCard(q));
+          if (picked) return;
+          const snapshot = questions.map((x) => ({ id: x.id, m: x.my_answer_id, b: x.my_bet_question_id }));
+          // optimistic: move the single daily bet here
+          questions.forEach((x) => {
+            x.my_bet_question_id = q.id;
+            x.my_answer_id = x.id === q.id ? a.id : null;
+          });
+          paint();
           try {
             await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
             toast('ההימור נשמר');
           } catch (e) {
-            q.my_answer_id = prev;            // revert
+            snapshot.forEach((s) => {
+              const x = questions.find((y) => y.id === s.id);
+              x.my_answer_id = s.m; x.my_bet_question_id = s.b;
+            });
+            paint();
             toast(e.message, true);
-            renderBets();
           }
         };
       }
@@ -500,21 +538,22 @@ async function renderBets() {
     }
     card.append(box);
 
-    if (showResults && q.status === 'resolved' && q.my_answer_id != null) {
+    if (showResults && q.status === 'resolved' && betHere) {
       const hit = q.my_answer_id === q.correct_answer_id;
       const gained = hit ? q.answers.find((a) => a.id === q.correct_answer_id)?.value ?? 0 : 0;
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' },
         hit ? `פגעת! ${fmt(gained)} נקודות` : 'החמצת בשאלה הזו'));
-    } else if (q.my_answer_id != null) {
-      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור שלך נשמר ✓'));
-    } else if (q.status !== 'open' || !isToday) {
-      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על השאלה הזו'));
+    } else if (betHere) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך כאן ✓'));
+    } else if (betElsewhere && isToday) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך על אירוע אחר — לחיצה תעביר לכאן'));
+    } else if (!isToday) {
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על האירוע הזה'));
     }
     return card;
   };
 
-  for (const q of questions) view.append(buildCard(q));
-  view.append(logoutFooter());
+  paint();
 }
 
 const logoutFooter = () => el('div', { style: 'margin-top:24px' },

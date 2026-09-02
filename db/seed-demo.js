@@ -73,6 +73,8 @@ async function main() {
     let created = 0;
     for (let d = 0; d < DAYS; d++) {
       const dayOffset = past ? -(d + 1) : d; // past: yesterday .. -DAYS
+      const dayQuestions = [];
+
       for (let s = 0; s < PER_DAY; s++) {
         const idx = d * PER_DAY + s;
         const [a, b] = pair(idx);
@@ -81,7 +83,7 @@ async function main() {
         const qr = await client.query(
           `INSERT INTO questions (event_date, text, status, position)
            VALUES (CURRENT_DATE + $1::int, $2, $3, $4)
-           RETURNING id`,
+           RETURNING id, event_date`,
           [dayOffset, PREFIX + g.text, past ? 'resolved' : 'open', s]
         );
         const qid = qr.rows[0].id;
@@ -96,32 +98,33 @@ async function main() {
           answerIds.push(ar.rows[0].id);
         }
 
+        const correctIdx = (idx * 7 + 2) % answerIds.length;
         if (past) {
-          // deterministic "correct" answer so the leaderboard has data
-          const correctIdx = (idx * 7 + 2) % answerIds.length;
           await client.query('UPDATE questions SET correct_answer_id = $1 WHERE id = $2', [answerIds[correctIdx], qid]);
-
-          // demo bets: each user bets on ~half the questions, with a
-          // per-user "skill" driving how often they pick the right answer
-          for (const uid of users) {
-            if (rnd(uid * 7 + qid * 13) >= 0.55) continue;
-            const skill = 0.3 + rnd(uid * 101) * 0.5; // 0.30–0.80
-            let pick;
-            if (rnd(uid * 3 + qid * 17) < skill) {
-              pick = answerIds[correctIdx];
-            } else {
-              const wrong = answerIds.filter((_, i) => i !== correctIdx);
-              pick = wrong[Math.floor(rnd(uid * 5 + qid * 11) * wrong.length)];
-            }
-            await client.query(
-              `INSERT INTO bets (user_id, question_id, answer_id) VALUES ($1, $2, $3)
-               ON CONFLICT (user_id, question_id) DO NOTHING`,
-              [uid, qid, pick]
-            );
-            bets++;
-          }
         }
+        dayQuestions.push({ qid, eventDate: qr.rows[0].event_date, answerIds, correctIdx });
         created++;
+      }
+
+      // one demo bet per user per day (on one of that day's questions)
+      if (past) {
+        for (const uid of users) {
+          if (rnd(uid * 7 + d * 13) >= 0.75) continue; // ~75% of days
+          const pickQ = dayQuestions[Math.floor(rnd(uid * 31 + d * 17) * dayQuestions.length)];
+          const skill = 0.3 + rnd(uid * 101) * 0.5; // 0.30–0.80
+          let pick;
+          if (rnd(uid * 3 + pickQ.qid * 17) < skill) {
+            pick = pickQ.answerIds[pickQ.correctIdx];
+          } else {
+            const wrong = pickQ.answerIds.filter((_, i) => i !== pickQ.correctIdx);
+            pick = wrong[Math.floor(rnd(uid * 5 + pickQ.qid * 11) * wrong.length)];
+          }
+          await client.query(
+            `INSERT INTO bets (user_id, question_id, answer_id, event_date) VALUES ($1, $2, $3, $4)`,
+            [uid, pickQ.qid, pick, pickQ.eventDate]
+          );
+          bets++;
+        }
       }
     }
 

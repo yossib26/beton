@@ -48,10 +48,22 @@ CREATE TABLE IF NOT EXISTS bets (
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   answer_id   INTEGER NOT NULL REFERENCES answers(id) ON DELETE CASCADE,
+  event_date  DATE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, question_id)
 );
+
+-- one bet per user per day (not per question)
+ALTER TABLE bets ADD COLUMN IF NOT EXISTS event_date DATE;
+UPDATE bets b SET event_date = q.event_date
+  FROM questions q WHERE q.id = b.question_id AND b.event_date IS NULL;
+DELETE FROM bets a USING bets b
+ WHERE a.user_id = b.user_id AND a.event_date = b.event_date
+   AND a.event_date IS NOT NULL
+   AND (a.updated_at, a.id) < (b.updated_at, b.id);
+ALTER TABLE bets DROP CONSTRAINT IF EXISTS bets_user_id_question_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS bets_user_day_key ON bets (user_id, event_date);
 `;
 
 const SEED_USERS = [

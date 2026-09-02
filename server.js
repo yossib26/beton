@@ -108,17 +108,16 @@ app.get('/api/questions', requireAuth, wrap(async (req, res) => {
         [ids]
       )).rows
     : [];
-  const myBets = ids.length
-    ? (await pool.query(
-        'SELECT question_id, answer_id FROM bets WHERE user_id = $1 AND question_id = ANY($2)',
-        [req.user.id, ids]
-      )).rows
-    : [];
-  const betByQ = Object.fromEntries(myBets.map((b) => [b.question_id, b.answer_id]));
+  // one bet per user per day
+  const dayBet = (await pool.query(
+    'SELECT question_id, answer_id FROM bets WHERE user_id = $1 AND event_date = COALESCE($2::date, CURRENT_DATE)',
+    [req.user.id, date]
+  )).rows[0] || null;
 
   res.json(q.rows.map((row) => ({
     ...row,
-    my_answer_id: betByQ[row.id] ?? null,
+    my_answer_id: dayBet && dayBet.question_id === row.id ? dayBet.answer_id : null,
+    my_bet_question_id: dayBet ? dayBet.question_id : null,
     answers: answers.filter((a) => a.question_id === row.id),
   })));
 }));
@@ -138,7 +137,7 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
     return res.status(400).json({ error: 'question_id ו-answer_id נדרשים' });
   }
   const { rows } = await pool.query(
-    `SELECT q.status, (q.event_date <> CURRENT_DATE) AS not_today, a.id AS answer_ok
+    `SELECT q.status, q.event_date, (q.event_date <> CURRENT_DATE) AS not_today, a.id AS answer_ok
        FROM questions q
        LEFT JOIN answers a ON a.id = $2 AND a.question_id = q.id
       WHERE q.id = $1`,
@@ -149,14 +148,27 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   if (rows[0].not_today) return res.status(409).json({ error: 'ניתן להמר רק על אירועי היום' });
   if (rows[0].status !== 'open') return res.status(409).json({ error: 'ההימור על השאלה נסגר' });
 
-  const saved = await pool.query(
-    `INSERT INTO bets (user_id, question_id, answer_id) VALUES ($1, $2, $3)
-     ON CONFLICT (user_id, question_id)
-     DO UPDATE SET answer_id = EXCLUDED.answer_id, updated_at = now()
-     RETURNING question_id, answer_id`,
-    [req.user.id, questionId, answerId]
-  );
-  res.json(saved.rows[0]);
+  // one bet per user per day — placing/moving it replaces any earlier bet that day
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM bets WHERE user_id = $1 AND event_date = $2', [
+      req.user.id, rows[0].event_date,
+    ]);
+    const saved = await client.query(
+      `INSERT INTO bets (user_id, question_id, answer_id, event_date)
+       VALUES ($1, $2, $3, $4)
+       RETURNING question_id, answer_id`,
+      [req.user.id, questionId, answerId, rows[0].event_date]
+    );
+    await client.query('COMMIT');
+    res.json(saved.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }));
 
 // --- roster (public: bettor names + score shown on the login page) --
