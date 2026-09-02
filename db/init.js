@@ -64,7 +64,27 @@ DELETE FROM bets a USING bets b
    AND (a.updated_at, a.id) < (b.updated_at, b.id);
 ALTER TABLE bets DROP CONSTRAINT IF EXISTS bets_user_id_question_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS bets_user_day_key ON bets (user_id, event_date);
+
+CREATE TABLE IF NOT EXISTS bet_messages (
+  id         SERIAL PRIMARY KEY,
+  text       TEXT NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
+
+const SEED_BET_MESSAGES = [
+  'הימור אמיץ! או טיפשי. נראה מחר 🤡',
+  'רשמנו. אם תפסיד — לא הכרנו 🙈',
+  'ההימור נשמר. אמא שלך גאה (כנראה) 🏆',
+  'בחירה מעניינת... אמרנו מעניינת, לא חכמה 🧠',
+  'יאללה, עכשיו רק להתפלל ⚽🙏',
+  'ההימור נקלט. הביטחון העצמי שלך מעורר השראה 😎',
+  'שמור על קור רוח. וגם על הכסף שאין לך 💸',
+  'בום! הימרת. הבורסה מקנאה 📈',
+  'נשמר בהצלחה. גורלך נחתם ✍️😈',
+  'הימור התקבל. חבל שאי אפשר להמר על זה שתפסיד 😏',
+];
 
 const SEED_USERS = [
   { name: 'Yossi Basson', email: 'oriki.basson@gmail.com', username: 'yossi', password: 'beton123', is_admin: true },
@@ -99,6 +119,14 @@ async function main() {
         [u.name, u.email, u.username, hashPassword(u.password), u.is_admin]
       );
     }
+  }
+
+  const haveMsgs = await pool.query('SELECT COUNT(*)::int AS c FROM bet_messages');
+  if (haveMsgs.rows[0].c === 0) {
+    for (let i = 0; i < SEED_BET_MESSAGES.length; i++) {
+      await pool.query('INSERT INTO bet_messages (text, position) VALUES ($1, $2)', [SEED_BET_MESSAGES[i], i]);
+    }
+    console.log(`seeded ${SEED_BET_MESSAGES.length} bet messages`);
   }
 
   const { rows } = await pool.query(

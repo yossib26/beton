@@ -162,7 +162,8 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
       [req.user.id, questionId, answerId, rows[0].event_date]
     );
     await client.query('COMMIT');
-    res.json(saved.rows[0]);
+    const msg = await pool.query('SELECT text FROM bet_messages ORDER BY random() LIMIT 1');
+    res.json({ ...saved.rows[0], message: msg.rows[0]?.text ?? null });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -442,6 +443,42 @@ app.delete('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
   if (id === req.user.id) return res.status(400).json({ error: 'אי אפשר למחוק את המשתמש שלך' });
   const r = await pool.query('DELETE FROM users WHERE id = $1', [id]);
   if (!r.rowCount) return res.status(404).json({ error: 'משתמש לא נמצא' });
+  res.json({ deleted: r.rowCount });
+}));
+
+// --- bet messages (funny popups shown to the bettor) ----------------
+app.get('/api/admin/bet-messages', requireAdmin, wrap(async (_req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, text, position FROM bet_messages ORDER BY position, id'
+  );
+  res.json(rows);
+}));
+
+app.post('/api/admin/bet-messages', requireAdmin, wrap(async (req, res) => {
+  const text = (req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
+  const pos = await pool.query('SELECT COALESCE(MAX(position) + 1, 0) AS p FROM bet_messages');
+  const { rows } = await pool.query(
+    'INSERT INTO bet_messages (text, position) VALUES ($1, $2) RETURNING id, text, position',
+    [text, pos.rows[0].p]
+  );
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/admin/bet-messages/:id', requireAdmin, wrap(async (req, res) => {
+  const text = (req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
+  const { rows } = await pool.query(
+    'UPDATE bet_messages SET text = $2 WHERE id = $1 RETURNING id, text, position',
+    [Number(req.params.id), text]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'הודעה לא נמצאה' });
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/bet-messages/:id', requireAdmin, wrap(async (req, res) => {
+  const r = await pool.query('DELETE FROM bet_messages WHERE id = $1', [Number(req.params.id)]);
+  if (!r.rowCount) return res.status(404).json({ error: 'הודעה לא נמצאה' });
   res.json({ deleted: r.rowCount });
 }));
 

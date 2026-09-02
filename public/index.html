@@ -199,6 +199,22 @@
   .toast.show { opacity: 1; }
   .toast.err { border-color: var(--bad); color: #fecaca; }
 
+  .popup-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(2,6,23,.55); padding: 24px;
+    opacity: 0; transition: opacity .18s;
+  }
+  .popup-overlay.show { opacity: 1; }
+  .popup-card {
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 16px; padding: 22px 24px; max-width: 340px; width: 100%;
+    text-align: center; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    transform: scale(.85); transition: transform .22s cubic-bezier(.2,1.5,.4,1);
+  }
+  .popup-overlay.show .popup-card { transform: scale(1); }
+
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
   /* single daily event, comfortably wide and centered */
@@ -297,6 +313,23 @@ const api = async (path, opts = {}) => {
   if (!res.ok) throw new Error(data?.error || `שגיאה ${res.status}`);
   return data;
 };
+let popupT;
+function showPopup(msg) {
+  if (!msg) return;
+  document.querySelector('.popup-overlay')?.remove();
+  const overlay = el('div', { className: 'popup-overlay' });
+  overlay.onclick = () => overlay.remove();
+  overlay.append(el('div', { className: 'popup-card' },
+    el('div', { style: 'font-size:2.4rem;line-height:1' }, '🎲'),
+    el('div', { style: 'font-size:1.05rem;font-weight:600' }, msg),
+    el('div', { className: 'muted', style: 'font-size:.75rem' }, 'הקש לסגירה'),
+  ));
+  document.body.append(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  clearTimeout(popupT);
+  popupT = setTimeout(() => overlay.remove(), 3600);
+}
+
 let toastT;
 const toast = (msg, isErr = false) => {
   const t = $('#toast');
@@ -501,8 +534,8 @@ async function renderBets() {
           q.my_answer_id = a.id; // optimistic
           paint();
           try {
-            await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
-            toast('ההימור נשמר');
+            const r = await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
+            showPopup(r?.message || 'ההימור נשמר ✓');
           } catch (e) {
             q.my_answer_id = prev;
             paint();

@@ -189,7 +189,7 @@ function render() {
   const m = $('#main');
   m.innerHTML = '';
   const nav = el('div', { className: 'tabnav' });
-  for (const [id, label] of [['events', 'אירועים'], ['users', 'משתמשים']]) {
+  for (const [id, label] of [['events', 'אירועים'], ['users', 'משתמשים'], ['messages', '💬 הודעות']]) {
     nav.append(el('button', {
       className: state.tab === id ? 'active' : '',
       type: 'button',
@@ -200,7 +200,65 @@ function render() {
   const body = el('div', { id: 'tabbody' });
   m.append(body);
   if (state.tab === 'events') renderEvents(body);
+  else if (state.tab === 'messages') renderMessages(body);
   else renderUsers(body);
+}
+
+// ---------------- bet messages tab ----------------
+async function renderMessages(root) {
+  root.innerHTML = '';
+  root.append(el('h2', {}, '💬 הודעות אחרי הימור'), el('div', { className: 'center' }, 'טוען…'));
+
+  let msgs;
+  try { msgs = await api('/api/admin/bet-messages'); }
+  catch (e) { toast(e.message, true); return; }
+
+  root.innerHTML = '';
+  root.append(
+    el('h2', {}, '💬 הודעות אחרי הימור'),
+    el('p', { className: 'muted', style: 'margin-top:0' }, 'בכל הימור מוקפצת למהמר הודעה אקראית מהרשימה.'),
+  );
+
+  const input = el('input', { placeholder: 'הודעה מצחיקה חדשה…' });
+  const addBtn = el('button', { className: 'btn primary', type: 'button' }, 'הוסף');
+  addBtn.onclick = async () => {
+    if (!input.value.trim()) return;
+    try {
+      await api('/api/admin/bet-messages', { method: 'POST', body: { text: input.value.trim() } });
+      input.value = '';
+      renderMessages(root);
+    } catch (e) { toast(e.message, true); }
+  };
+  root.append(el('div', { className: 'card' },
+    el('div', { className: 'row wrap-row' }, el('div', { className: 'grow' }, input), addBtn)));
+
+  const list = el('div', { className: 'card' });
+  if (!msgs.length) list.append(el('div', { className: 'muted' }, 'אין הודעות'));
+  msgs.forEach((msg, i) => {
+    const txt = el('input', { value: msg.text });
+    const save = el('button', {
+      className: 'btn ghost sm', type: 'button',
+      onclick: async () => {
+        if (txt.value.trim() === msg.text || !txt.value.trim()) return;
+        try { await api('/api/admin/bet-messages/' + msg.id, { method: 'PATCH', body: { text: txt.value.trim() } }); toast('נשמר'); msg.text = txt.value.trim(); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, '💾');
+    const del = el('button', {
+      className: 'btn danger sm', type: 'button',
+      onclick: async () => {
+        if (!confirm('למחוק את ההודעה?')) return;
+        try { await api('/api/admin/bet-messages/' + msg.id, { method: 'DELETE' }); renderMessages(root); }
+        catch (e) { toast(e.message, true); }
+      },
+    }, '🗑');
+    list.append(el('div', { className: 'row wrap-row', style: i ? 'padding-top:8px;border-top:1px solid var(--line);margin-top:8px' : '' },
+      el('div', { className: 'muted', style: 'width:20px' }, String(i + 1)),
+      el('div', { className: 'grow' }, txt),
+      save, del,
+    ));
+  });
+  root.append(list);
 }
 
 // ---------------- events tab ----------------
