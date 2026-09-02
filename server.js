@@ -26,7 +26,7 @@ app.use(async (req, _res, next) => {
     const id = readSession(req.cookies.sid);
     if (id) {
       const { rows } = await pool.query(
-        'SELECT id, name, username, is_admin FROM users WHERE id = $1',
+        'SELECT id, name, username, is_admin FROM users WHERE id = $1 AND active = true',
         [id]
       );
       req.user = rows[0] || null;
@@ -82,12 +82,15 @@ app.post('/api/auth/login', wrap(async (req, res) => {
   const username = (req.body?.username || '').trim();
   const password = req.body?.password || '';
   const { rows } = await pool.query(
-    'SELECT id, name, username, is_admin, password_hash FROM users WHERE lower(username) = lower($1)',
+    'SELECT id, name, username, is_admin, active, password_hash FROM users WHERE lower(username) = lower($1)',
     [username]
   );
   const user = rows[0];
   if (!user || !verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: 'שם משתמש או סיסמה שגויים' });
+  }
+  if (!user.active) {
+    return res.status(403).json({ error: 'החשבון הושבת. פנה למנהל המערכת.' });
   }
   setSession(res, user.id);
   res.json({ id: user.id, name: user.name, username: user.username, is_admin: user.is_admin });
@@ -206,7 +209,7 @@ app.get('/api/users', wrap(async (_req, res) => {
       LEFT JOIN bets b ON b.user_id = u.id
       LEFT JOIN questions q ON q.id = b.question_id
       LEFT JOIN answers a ON a.id = b.answer_id
-     WHERE u.is_admin = false
+     WHERE u.is_admin = false AND u.active = true
      GROUP BY u.id
      ORDER BY u.id
   `);
@@ -402,7 +405,7 @@ app.delete('/api/admin/answers/:id', requireAdmin, wrap(async (req, res) => {
 
 app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
   const { rows } = await pool.query(`
-    SELECT u.id, u.name, u.username, u.is_admin, u.icon, u.created_at,
+    SELECT u.id, u.name, u.username, u.is_admin, u.icon, u.active, u.created_at,
            COUNT(b.id)::int AS bets_count
       FROM users u
       LEFT JOIN bets b ON b.user_id = u.id
@@ -458,10 +461,14 @@ app.patch('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
   const name = body.name != null ? String(body.name).trim() : null;
   const password = body.password || null;
   const isAdmin = body.is_admin;
+  const active = typeof body.active === 'boolean' ? body.active : null;
   const hasIcon = Object.prototype.hasOwnProperty.call(body, 'icon');
   const icon = hasIcon ? (String(body.icon || '').slice(0, 16) || null) : null;
   if (id === req.user.id && isAdmin === false) {
     return res.status(400).json({ error: 'אי אפשר להסיר לעצמך הרשאת ניהול' });
+  }
+  if (id === req.user.id && active === false) {
+    return res.status(400).json({ error: 'אי אפשר להשבית את המשתמש שלך' });
   }
   if (password != null && password.length < 4) {
     return res.status(400).json({ error: 'סיסמה קצרה מדי (לפחות 4 תווים)' });
@@ -471,10 +478,11 @@ app.patch('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
         name = COALESCE($2, name),
         is_admin = COALESCE($3, is_admin),
         password_hash = COALESCE($4, password_hash),
-        icon = CASE WHEN $5 THEN $6 ELSE icon END
+        icon = CASE WHEN $5 THEN $6 ELSE icon END,
+        active = COALESCE($7, active)
       WHERE id = $1
-      RETURNING id, name, username, is_admin, icon, created_at`,
-    [id, name, typeof isAdmin === 'boolean' ? isAdmin : null, password ? hashPassword(password) : null, hasIcon, icon]
+      RETURNING id, name, username, is_admin, icon, active, created_at`,
+    [id, name, typeof isAdmin === 'boolean' ? isAdmin : null, password ? hashPassword(password) : null, hasIcon, icon, active]
   );
   if (!rows.length) return res.status(404).json({ error: 'משתמש לא נמצא' });
   res.json(rows[0]);

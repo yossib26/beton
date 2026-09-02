@@ -592,7 +592,7 @@ async function renderUsers(root) {
 
   const table = (list, asAdmin) => {
     const head = [el('th', {}, '#'), el('th', {}, 'שם'), el('th', {}, 'משתמש'), el('th', {}, 'אייקון')];
-    if (!asAdmin) head.push(el('th', {}, 'הימורים'));
+    if (!asAdmin) head.push(el('th', {}, 'הימורים'), el('th', {}, 'סטטוס'));
     head.push(el('th', {}, 'פעולות'));
     const tbl = el('table');
     tbl.append(el('tr', {}, ...head));
@@ -629,6 +629,19 @@ async function renderUsers(root) {
           catch (e) { toast(e.message, true); }
         },
       }, 'מחק');
+      // bettors can be deactivated: no login, hidden from the app roster/icons
+      const activeBtn = el('button', {
+        className: 'btn sm ' + (u.active ? 'ghost' : 'primary'), type: 'button', disabled: isMe,
+        onclick: async () => {
+          const next = !u.active;
+          if (next === false && !confirm(`להשבית את ${u.name}? הוא לא יוכל להיכנס לאפליקציה ולא יוצג בה.`)) return;
+          try {
+            await api('/api/admin/users/' + u.id, { method: 'PATCH', body: { active: next } });
+            toast(next ? 'הופעל' : 'הושבת');
+            renderUsers(root);
+          } catch (e) { toast(e.message, true); }
+        },
+      }, u.active ? '⏸ השבת' : '▶ הפעל');
       const iconSel = el('select', { style: 'width:auto;font-size:1.05rem;padding:6px 8px' });
       iconSel.append(el('option', { value: '' }, '🎲'));
       for (const ic of USER_ICONS) {
@@ -646,9 +659,16 @@ async function renderUsers(root) {
         el('td', { className: 'muted' }, u.username || '—'),
         el('td', {}, iconSel),
       ];
-      if (!asAdmin) cells.push(el('td', { className: 'muted' }, String(u.bets_count)));
-      cells.push(el('td', {}, el('div', { className: 'row wrap-row' }, renameBtn, resetBtn, moveBtn, delBtn)));
-      tbl.append(el('tr', {}, ...cells));
+      const actions = [renameBtn, resetBtn, moveBtn, delBtn];
+      if (!asAdmin) {
+        cells.push(el('td', { className: 'muted' }, String(u.bets_count)));
+        cells.push(el('td', {}, el('span', {
+          className: 'pill ' + (u.active ? 'open' : 'closed'),
+        }, u.active ? 'פעיל' : 'מושבת')));
+        actions.splice(3, 0, activeBtn);
+      }
+      cells.push(el('td', {}, el('div', { className: 'row wrap-row' }, ...actions)));
+      tbl.append(el('tr', { style: (!asAdmin && !u.active) ? 'opacity:.5' : '' }, ...cells));
     }
     return el('div', { className: 'card tbl-scroll' }, tbl);
   };
