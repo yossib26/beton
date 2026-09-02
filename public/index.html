@@ -306,8 +306,7 @@ const api = async (path, opts = {}) => {
   });
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (res.status === 401 && path !== '/api/auth/me') {
-    state.user = null;
-    renderAuth();
+    goToLogin(data?.error || 'נדרשת התחברות מחדש');
     throw new Error(data?.error || 'נדרשת התחברות');
   }
   if (!res.ok) throw new Error(data?.error || `שגיאה ${res.status}`);
@@ -469,7 +468,7 @@ function dateBar(onChange) {
     el('button', {
       className: 'btn sm' + (isToday ? ' primary' : ''), type: 'button',
       disabled: isToday, onclick: () => { state.date = today; onChange(); },
-    }, 'היום'),
+    }, 'ההימור היומי'),
     el('button', { className: 'btn sm', type: 'button', disabled: isToday, onclick: () => shift(1) }, 'היום הבא ›'),
   );
 }
@@ -621,14 +620,47 @@ function boot() {
   document.body.classList.remove('auth-mode');
   $('#who').textContent = state.user.name + (state.user.is_admin ? ' · מנהל' : '');
   $('#logoutBtn').hidden = false;
+  startSessionWatch();
   route();
 }
 async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  state.user = null;
-  renderAuth();
+  goToLogin();
 }
 $('#logoutBtn').onclick = logout;
+
+// send an expired / deactivated user back to the login screen
+function goToLogin(msg) {
+  stopSessionWatch();
+  state.user = null;
+  renderAuth();
+  if (msg) toast(msg, true);
+}
+
+// keep verifying the session is still valid: on load, on an interval,
+// and whenever the tab regains focus. A null answer means the cookie is
+// gone, expired, or the account was deactivated → back to login.
+let sessionTimer = null;
+async function verifySession() {
+  if (!state.user) return;
+  let me;
+  try { me = await api('/api/auth/me'); }
+  catch { return; } // network hiccup — don't log the user out over it
+  if (!me || me.id !== state.user.id) {
+    goToLogin('החיבור הסתיים. יש להתחבר מחדש.');
+  }
+}
+function startSessionWatch() {
+  stopSessionWatch();
+  sessionTimer = setInterval(verifySession, 60000);
+  document.addEventListener('visibilitychange', onVisible);
+}
+function stopSessionWatch() {
+  clearInterval(sessionTimer);
+  sessionTimer = null;
+  document.removeEventListener('visibilitychange', onVisible);
+}
+function onVisible() { if (document.visibilityState === 'visible') verifySession(); }
 
 (async () => {
   try {
