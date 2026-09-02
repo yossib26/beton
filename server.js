@@ -64,6 +64,18 @@ const wrap = (fn) => (req, res) =>
     if (!res.headersSent) res.status(500).json({ error: 'שגיאת שרת' });
   });
 
+// --- health / diagnostics ----------------------------------------------
+app.get('/api/health', async (_req, res) => {
+  const url = process.env.DATABASE_URL || '';
+  const host = (url.match(/@([^/:?]+)/) || [])[1] || null; // host only, no creds
+  try {
+    const { rows } = await pool.query('SELECT 1 AS ok');
+    res.json({ ok: true, db: rows[0].ok === 1, host });
+  } catch (err) {
+    res.status(500).json({ ok: false, host, error: err.message, code: err.code || null });
+  }
+});
+
 // --- auth -----------------------------------------------------------------
 // no self-registration: accounts are created in the admin console only
 app.post('/api/auth/login', wrap(async (req, res) => {

@@ -15,4 +15,7 @@ export const pool =
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
     max: process.env.VERCEL ? 1 : 10,
+    // fail fast instead of hanging the whole serverless invocation when the
+    // database is unreachable (wrong DATABASE_URL, Neon IP-allow list, …)
+    connectionTimeoutMillis: 8000,
   }));
