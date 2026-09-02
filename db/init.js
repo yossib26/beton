@@ -65,6 +65,8 @@ DELETE FROM bets a USING bets b
    AND (a.updated_at, a.id) < (b.updated_at, b.id);
 ALTER TABLE bets DROP CONSTRAINT IF EXISTS bets_user_id_question_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS bets_user_day_key ON bets (user_id, event_date);
+-- how many times the bettor has changed this day's bet (max 3, enforced in the API)
+ALTER TABLE bets ADD COLUMN IF NOT EXISTS change_count INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS bet_messages (
   id         SERIAL PRIMARY KEY,

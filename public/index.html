@@ -502,12 +502,15 @@ async function renderBets() {
   const q = questions.find((x) => x.id === betQid) || questions[0];
 
   const showResults = !isToday; // today: show only the chosen bet, never results
+  const CHANGE_LIMIT = 3;
   const slot = el('div', { className: 'bet-slot' });
   view.append(slot, tipCard(), crowdStrip());
 
   const paint = () => {
     slot.innerHTML = '';
     const betHere = q.my_answer_id != null;
+    const changesLeft = CHANGE_LIMIT - (q.my_bet_changes || 0);
+    const locked = betHere && changesLeft <= 0; // used up all 3 changes
     const card = el('div', { className: 'card' + (betHere ? ' bet-here' : '') });
     card.append(el('div', { className: 'row' },
       el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
@@ -521,22 +524,26 @@ async function renderBets() {
       const wrongPick = showResults && q.status === 'resolved' && picked && !isCorrect;
       const btn = el('button', {
         className: 'answer' + (picked ? ' picked' : '') + (isCorrect ? ' correct' : '') + (wrongPick ? ' wrongpick' : ''),
-        disabled: q.status !== 'open' || !isToday,
+        disabled: q.status !== 'open' || !isToday || locked,
       },
         el('span', {}, a.text + (picked ? '  ✓' : '')),
         el('span', { className: 'val' }, fmt(a.value)),
       );
-      if (q.status === 'open' && isToday) {
+      if (q.status === 'open' && isToday && !locked) {
         btn.onclick = async () => {
           if (picked) return;
           const prev = q.my_answer_id;
+          const prevChanges = q.my_bet_changes || 0;
           q.my_answer_id = a.id; // optimistic
           paint();
           try {
             const r = await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
+            if (r && typeof r.change_count === 'number') q.my_bet_changes = r.change_count;
+            paint();
             showPopup(r?.message || 'ההימור נשמר ✓');
           } catch (e) {
             q.my_answer_id = prev;
+            q.my_bet_changes = prevChanges;
             paint();
             toast(e.message, true);
           }
@@ -553,6 +560,13 @@ async function renderBets() {
         hit ? `פגעת! ${fmt(gained)} נקודות` : 'החמצת בשאלה הזו'));
     } else if (betHere) {
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך ✓'));
+      if (isToday && q.status === 'open') {
+        card.append(locked
+          ? el('div', { style: 'margin-top:4px;color:var(--bad);font-size:.85rem' },
+              'לא ניתן לשנות שוב את ההימור על אירוע זה')
+          : el('div', { className: 'muted', style: 'margin-top:4px;font-size:.85rem' },
+              `אפשר לשנות את ההימור עוד ${changesLeft} ${changesLeft === 1 ? 'פעם' : 'פעמים'}`));
+      }
     } else if (!isToday) {
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת ביום הזה'));
     }

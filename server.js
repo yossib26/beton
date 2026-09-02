@@ -71,6 +71,9 @@ const wrap = (fn) => (req, res) =>
 const WINDOW_START_SQL =
   '(CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int - 2)';
 
+// a bettor may change a given day's bet at most this many times
+const BET_CHANGE_LIMIT = 3;
+
 // --- health / diagnostics ----------------------------------------------
 app.get('/api/health', async (_req, res) => {
   const url = process.env.DATABASE_URL || '';
@@ -132,7 +135,7 @@ app.get('/api/questions', requireAuth, wrap(async (req, res) => {
     : [];
   // one bet per user per day
   const dayBet = (await pool.query(
-    'SELECT question_id, answer_id FROM bets WHERE user_id = $1 AND event_date = COALESCE($2::date, CURRENT_DATE)',
+    'SELECT question_id, answer_id, change_count FROM bets WHERE user_id = $1 AND event_date = COALESCE($2::date, CURRENT_DATE)',
     [req.user.id, date]
   )).rows[0] || null;
 
@@ -140,6 +143,7 @@ app.get('/api/questions', requireAuth, wrap(async (req, res) => {
     ...row,
     my_answer_id: dayBet && dayBet.question_id === row.id ? dayBet.answer_id : null,
     my_bet_question_id: dayBet ? dayBet.question_id : null,
+    my_bet_changes: dayBet ? dayBet.change_count : 0,
     answers: answers.filter((a) => a.question_id === row.id),
   })));
 }));
@@ -170,19 +174,39 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
   if (rows[0].not_today) return res.status(409).json({ error: 'ניתן להמר רק על אירועי היום' });
   if (rows[0].status !== 'open') return res.status(409).json({ error: 'ההימור על השאלה נסגר' });
 
-  // one bet per user per day — placing/moving it replaces any earlier bet that day
+  // one bet per user per day. The first placement is free; after that each
+  // change to a different answer counts, and is capped at BET_CHANGE_LIMIT.
+  const eventDate = rows[0].event_date;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('DELETE FROM bets WHERE user_id = $1 AND event_date = $2', [
-      req.user.id, rows[0].event_date,
-    ]);
-    const saved = await client.query(
-      `INSERT INTO bets (user_id, question_id, answer_id, event_date)
-       VALUES ($1, $2, $3, $4)
-       RETURNING question_id, answer_id`,
-      [req.user.id, questionId, answerId, rows[0].event_date]
-    );
+    const existing = (await client.query(
+      'SELECT id, question_id, answer_id, change_count FROM bets WHERE user_id = $1 AND event_date = $2 FOR UPDATE',
+      [req.user.id, eventDate]
+    )).rows[0];
+
+    let saved;
+    if (!existing) {
+      saved = (await client.query(
+        `INSERT INTO bets (user_id, question_id, answer_id, event_date, change_count)
+         VALUES ($1, $2, $3, $4, 0)
+         RETURNING question_id, answer_id, change_count`,
+        [req.user.id, questionId, answerId, eventDate]
+      )).rows[0];
+    } else if (existing.question_id === questionId && existing.answer_id === answerId) {
+      saved = existing; // no actual change — leave the counter untouched
+    } else if (existing.change_count >= BET_CHANGE_LIMIT) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'לא ניתן לשנות שוב את ההימור על אירוע זה' });
+    } else {
+      saved = (await client.query(
+        `UPDATE bets SET question_id = $2, answer_id = $3,
+                change_count = change_count + 1, updated_at = now()
+          WHERE id = $1
+          RETURNING question_id, answer_id, change_count`,
+        [existing.id, questionId, answerId]
+      )).rows[0];
+    }
     await client.query('COMMIT');
     // reuse `client` (not pool.query): on Vercel the pool is capped at 1
     // connection, so asking the pool for another one here would deadlock
@@ -194,7 +218,13 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
         ? message.split('{name}').join(req.user.name)
         : `${req.user.name}, ${message}`;
     }
-    res.json({ ...saved.rows[0], message });
+    res.json({
+      question_id: saved.question_id,
+      answer_id: saved.answer_id,
+      change_count: saved.change_count,
+      changes_left: Math.max(0, BET_CHANGE_LIMIT - saved.change_count),
+      message,
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
