@@ -189,7 +189,11 @@ function render() {
   const m = $('#main');
   m.innerHTML = '';
   const nav = el('div', { className: 'tabnav' });
-  for (const [id, label] of [['events', 'אירועים'], ['users', 'משתמשים'], ['messages', '💬 הודעות']]) {
+  const tabs = [
+    ['events', 'אירועים'], ['users', 'משתמשים'],
+    ['messages', '💬 הודעות'], ['tips', '💡 טיפים'],
+  ];
+  for (const [id, label] of tabs) {
     nav.append(el('button', {
       className: state.tab === id ? 'active' : '',
       type: 'button',
@@ -200,55 +204,59 @@ function render() {
   const body = el('div', { id: 'tabbody' });
   m.append(body);
   if (state.tab === 'events') renderEvents(body);
-  else if (state.tab === 'messages') renderMessages(body);
+  else if (state.tab === 'messages') renderTextPool(body, {
+    endpoint: 'bet-messages', title: '💬 הודעות אחרי הימור',
+    hint: 'בכל הימור מוקפצת למהמר הודעה אקראית. שם המהמר מתווסף בהתחלה; אפשר גם לשלב {name} בתוך הטקסט.',
+    placeholder: 'הודעה מצחיקה חדשה… (אפשר {name})',
+  });
+  else if (state.tab === 'tips') renderTextPool(body, {
+    endpoint: 'daily-tips', title: '💡 טיפ יומי',
+    hint: 'במסך ההימורים מוצג טיפ אקראי אחד מהרשימה בכל טעינה.',
+    placeholder: 'טיפ חדש מעולם ההימורים…',
+  });
   else renderUsers(body);
 }
 
-// ---------------- bet messages tab ----------------
-async function renderMessages(root) {
+// ---------------- editable text pool (messages / tips) ----------------
+async function renderTextPool(root, { endpoint, title, hint, placeholder }) {
+  const reload = () => renderTextPool(root, { endpoint, title, hint, placeholder });
   root.innerHTML = '';
-  root.append(el('h2', {}, '💬 הודעות אחרי הימור'), el('div', { className: 'center' }, 'טוען…'));
+  root.append(el('h2', {}, title), el('div', { className: 'center' }, 'טוען…'));
 
-  let msgs;
-  try { msgs = await api('/api/admin/bet-messages'); }
+  let items;
+  try { items = await api('/api/admin/' + endpoint); }
   catch (e) { toast(e.message, true); return; }
 
   root.innerHTML = '';
-  root.append(
-    el('h2', {}, '💬 הודעות אחרי הימור'),
-    el('p', { className: 'muted', style: 'margin-top:0' }, 'בכל הימור מוקפצת למהמר הודעה אקראית מהרשימה.'),
-  );
+  root.append(el('h2', {}, title), el('p', { className: 'muted', style: 'margin-top:0' }, hint));
 
-  const input = el('input', { placeholder: 'הודעה מצחיקה חדשה…' });
+  const input = el('input', { placeholder });
   const addBtn = el('button', { className: 'btn primary', type: 'button' }, 'הוסף');
   addBtn.onclick = async () => {
     if (!input.value.trim()) return;
-    try {
-      await api('/api/admin/bet-messages', { method: 'POST', body: { text: input.value.trim() } });
-      input.value = '';
-      renderMessages(root);
-    } catch (e) { toast(e.message, true); }
+    try { await api('/api/admin/' + endpoint, { method: 'POST', body: { text: input.value.trim() } }); input.value = ''; reload(); }
+    catch (e) { toast(e.message, true); }
   };
   root.append(el('div', { className: 'card' },
     el('div', { className: 'row wrap-row' }, el('div', { className: 'grow' }, input), addBtn)));
 
   const list = el('div', { className: 'card' });
-  if (!msgs.length) list.append(el('div', { className: 'muted' }, 'אין הודעות'));
-  msgs.forEach((msg, i) => {
-    const txt = el('input', { value: msg.text });
+  if (!items.length) list.append(el('div', { className: 'muted' }, 'אין פריטים'));
+  items.forEach((it, i) => {
+    const txt = el('input', { value: it.text });
     const save = el('button', {
       className: 'btn ghost sm', type: 'button',
       onclick: async () => {
-        if (txt.value.trim() === msg.text || !txt.value.trim()) return;
-        try { await api('/api/admin/bet-messages/' + msg.id, { method: 'PATCH', body: { text: txt.value.trim() } }); toast('נשמר'); msg.text = txt.value.trim(); }
+        if (!txt.value.trim() || txt.value.trim() === it.text) return;
+        try { await api('/api/admin/' + endpoint + '/' + it.id, { method: 'PATCH', body: { text: txt.value.trim() } }); it.text = txt.value.trim(); toast('נשמר'); }
         catch (e) { toast(e.message, true); }
       },
     }, '💾');
     const del = el('button', {
       className: 'btn danger sm', type: 'button',
       onclick: async () => {
-        if (!confirm('למחוק את ההודעה?')) return;
-        try { await api('/api/admin/bet-messages/' + msg.id, { method: 'DELETE' }); renderMessages(root); }
+        if (!confirm('למחוק?')) return;
+        try { await api('/api/admin/' + endpoint + '/' + it.id, { method: 'DELETE' }); reload(); }
         catch (e) { toast(e.message, true); }
       },
     }, '🗑');

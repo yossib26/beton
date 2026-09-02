@@ -163,7 +163,13 @@ app.post('/api/bets', requireAuth, wrap(async (req, res) => {
     );
     await client.query('COMMIT');
     const msg = await pool.query('SELECT text FROM bet_messages ORDER BY random() LIMIT 1');
-    res.json({ ...saved.rows[0], message: msg.rows[0]?.text ?? null });
+    let message = msg.rows[0]?.text ?? null;
+    if (message) {
+      message = message.includes('{name}')
+        ? message.split('{name}').join(req.user.name)
+        : `${req.user.name}, ${message}`;
+    }
+    res.json({ ...saved.rows[0], message });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -446,40 +452,44 @@ app.delete('/api/admin/users/:id', requireAdmin, wrap(async (req, res) => {
   res.json({ deleted: r.rowCount });
 }));
 
-// --- bet messages (funny popups shown to the bettor) ----------------
-app.get('/api/admin/bet-messages', requireAdmin, wrap(async (_req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, text, position FROM bet_messages ORDER BY position, id'
-  );
-  res.json(rows);
-}));
+// --- editable text pools: bet_messages (popup after a bet) + daily_tips --
+function textPoolRoutes(path, table, label) {
+  app.get(`/api/admin/${path}`, requireAdmin, wrap(async (_req, res) => {
+    const { rows } = await pool.query(`SELECT id, text, position FROM ${table} ORDER BY position, id`);
+    res.json(rows);
+  }));
+  app.post(`/api/admin/${path}`, requireAdmin, wrap(async (req, res) => {
+    const text = (req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
+    const pos = await pool.query(`SELECT COALESCE(MAX(position) + 1, 0) AS p FROM ${table}`);
+    const { rows } = await pool.query(
+      `INSERT INTO ${table} (text, position) VALUES ($1, $2) RETURNING id, text, position`,
+      [text, pos.rows[0].p]
+    );
+    res.status(201).json(rows[0]);
+  }));
+  app.patch(`/api/admin/${path}/:id`, requireAdmin, wrap(async (req, res) => {
+    const text = (req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
+    const { rows } = await pool.query(
+      `UPDATE ${table} SET text = $2 WHERE id = $1 RETURNING id, text, position`,
+      [Number(req.params.id), text]
+    );
+    if (!rows.length) return res.status(404).json({ error: `${label} לא נמצא` });
+    res.json(rows[0]);
+  }));
+  app.delete(`/api/admin/${path}/:id`, requireAdmin, wrap(async (req, res) => {
+    const r = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [Number(req.params.id)]);
+    if (!r.rowCount) return res.status(404).json({ error: `${label} לא נמצא` });
+    res.json({ deleted: r.rowCount });
+  }));
+}
+textPoolRoutes('bet-messages', 'bet_messages', 'פריט');
+textPoolRoutes('daily-tips', 'daily_tips', 'טיפ');
 
-app.post('/api/admin/bet-messages', requireAdmin, wrap(async (req, res) => {
-  const text = (req.body?.text || '').trim();
-  if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
-  const pos = await pool.query('SELECT COALESCE(MAX(position) + 1, 0) AS p FROM bet_messages');
-  const { rows } = await pool.query(
-    'INSERT INTO bet_messages (text, position) VALUES ($1, $2) RETURNING id, text, position',
-    [text, pos.rows[0].p]
-  );
-  res.status(201).json(rows[0]);
-}));
-
-app.patch('/api/admin/bet-messages/:id', requireAdmin, wrap(async (req, res) => {
-  const text = (req.body?.text || '').trim();
-  if (!text) return res.status(400).json({ error: 'טקסט נדרש' });
-  const { rows } = await pool.query(
-    'UPDATE bet_messages SET text = $2 WHERE id = $1 RETURNING id, text, position',
-    [Number(req.params.id), text]
-  );
-  if (!rows.length) return res.status(404).json({ error: 'הודעה לא נמצאה' });
-  res.json(rows[0]);
-}));
-
-app.delete('/api/admin/bet-messages/:id', requireAdmin, wrap(async (req, res) => {
-  const r = await pool.query('DELETE FROM bet_messages WHERE id = $1', [Number(req.params.id)]);
-  if (!r.rowCount) return res.status(404).json({ error: 'הודעה לא נמצאה' });
-  res.json({ deleted: r.rowCount });
+app.get('/api/daily-tip', requireAuth, wrap(async (_req, res) => {
+  const { rows } = await pool.query('SELECT text FROM daily_tips ORDER BY random() LIMIT 1');
+  res.json({ text: rows[0]?.text ?? null });
 }));
 
 // --- static (local dev only; on Vercel public/ is served as static assets) --

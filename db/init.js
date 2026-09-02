@@ -71,19 +71,39 @@ CREATE TABLE IF NOT EXISTS bet_messages (
   position   INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS daily_tips (
+  id         SERIAL PRIMARY KEY,
+  text       TEXT NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
+const SEED_DAILY_TIPS = [
+  'קבע לעצמך תקציב יומי ואל תחרוג ממנו — משמעת שווה יותר ממזל.',
+  'הימור מהלב לרוב מפסיד. בדוק נתונים לפני שאתה מהמר.',
+  'רצף הפסדים? קח הפסקה. רדיפה אחרי הפסד היא הדרך הבטוחה להפסיד עוד.',
+  'יחס תשלום גבוה = סיכוי נמוך. אל תתפתה רק לזכייה הגדולה.',
+  'עקוב אחרי ההימורים שלך — סטטיסטיקה אישית חושפת דפוסים שלא שמת לב אליהם.',
+  'אף אחד לא צודק תמיד. גם 55% הצלחה זו תוצאה מצוינת לאורך זמן.',
+  'אל תהמר תחת השפעה של אלכוהול, כעס או התלהבות יתר.',
+  'מידע מוקדם שווה זהב — פציעות, הרכבים ומזג אוויר משפיעים על התוצאה.',
+  'הימור הוא בידור, לא מקור הכנסה. תתייחס אליו ככה.',
+  'עדיף פיזור קטן על פני הכול על קלף אחד — סיכון מרוכז נגמר רע.',
+];
+
 const SEED_BET_MESSAGES = [
-  'הימור אמיץ! או טיפשי. נראה מחר 🤡',
-  'רשמנו. אם תפסיד — לא הכרנו 🙈',
-  'ההימור נשמר. אמא שלך גאה (כנראה) 🏆',
-  'בחירה מעניינת... אמרנו מעניינת, לא חכמה 🧠',
-  'יאללה, עכשיו רק להתפלל ⚽🙏',
-  'ההימור נקלט. הביטחון העצמי שלך מעורר השראה 😎',
-  'שמור על קור רוח. וגם על הכסף שאין לך 💸',
-  'בום! הימרת. הבורסה מקנאה 📈',
-  'נשמר בהצלחה. גורלך נחתם ✍️😈',
-  'הימור התקבל. חבל שאי אפשר להמר על זה שתפסיד 😏',
+  'הימור אמיץ, {name}! או טיפשי. נראה מחר 🤡',
+  '{name}, רשמנו. אם תפסיד — לא הכרנו 🙈',
+  'ההימור נשמר. אמא של {name} גאה (כנראה) 🏆',
+  'בחירה מעניינת, {name}... אמרנו מעניינת, לא חכמה 🧠',
+  '{name}, יאללה — עכשיו רק להתפלל ⚽🙏',
+  'ההימור נקלט. הביטחון העצמי של {name} מעורר השראה 😎',
+  '{name}, שמור על קור רוח. וגם על הכסף שאין לך 💸',
+  'בום! {name} הימר. הבורסה מקנאה 📈',
+  'נשמר בהצלחה. גורלו של {name} נחתם ✍️😈',
+  '{name}, חבל שאי אפשר להמר על זה שתפסיד 😏',
 ];
 
 const SEED_USERS = [
@@ -127,6 +147,14 @@ async function main() {
       await pool.query('INSERT INTO bet_messages (text, position) VALUES ($1, $2)', [SEED_BET_MESSAGES[i], i]);
     }
     console.log(`seeded ${SEED_BET_MESSAGES.length} bet messages`);
+  }
+
+  const haveTips = await pool.query('SELECT COUNT(*)::int AS c FROM daily_tips');
+  if (haveTips.rows[0].c === 0) {
+    for (let i = 0; i < SEED_DAILY_TIPS.length; i++) {
+      await pool.query('INSERT INTO daily_tips (text, position) VALUES ($1, $2)', [SEED_DAILY_TIPS[i], i]);
+    }
+    console.log(`seeded ${SEED_DAILY_TIPS.length} daily tips`);
   }
 
   const { rows } = await pool.query(

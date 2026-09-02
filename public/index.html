@@ -220,6 +220,8 @@
   /* single daily event, comfortably wide and centered */
   .bet-slot { max-width: 620px; margin: 0 auto; }
   .card.bet-here { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .tip-card { background: linear-gradient(180deg, rgba(56,189,248,.08), transparent), var(--surface); }
+  .tip-card .tip-text { color: var(--text); font-size: .92rem; line-height: 1.5; }
 
   /* login: fill exactly one screen, no scroll */
   body.auth-mode main { padding-bottom: 16px; }
@@ -494,7 +496,7 @@ async function renderBets() {
   }
 
   if (!questions.length) {
-    view.append(el('div', { className: 'center' }, 'אין אירוע ליום הזה 🤷'), logoutFooter());
+    view.append(el('div', { className: 'center' }, 'אין אירוע ליום הזה 🤷'), tipCard());
     return;
   }
 
@@ -504,7 +506,7 @@ async function renderBets() {
 
   const showResults = !isToday; // today: show only the chosen bet, never results
   const slot = el('div', { className: 'bet-slot' });
-  view.append(slot, logoutFooter());
+  view.append(slot, tipCard());
 
   const paint = () => {
     slot.innerHTML = '';
@@ -563,8 +565,19 @@ async function renderBets() {
   paint();
 }
 
-const logoutFooter = () => el('div', { style: 'margin-top:24px' },
-  el('button', { className: 'btn ghost', style: 'width:100%', type: 'button', onclick: logout }, '↩ התנתקות'));
+// daily betting-world tip, random per load, managed in the admin console
+function tipCard() {
+  const wrap = el('div', { className: 'bet-slot', style: 'margin-top:20px' });
+  const card = el('div', { className: 'card tip-card' },
+    el('div', { style: 'font-weight:700;margin-bottom:4px' }, '💡 טיפ היום'),
+    el('div', { className: 'tip-text muted' }, '…'),
+  );
+  wrap.append(card);
+  api('/api/daily-tip')
+    .then((r) => { if (r?.text) card.querySelector('.tip-text').textContent = r.text; else wrap.remove(); })
+    .catch(() => wrap.remove());
+  return wrap;
+}
 
 // ---------------- Leaderboard ----------------
 async function renderBoard() {

@@ -51,8 +51,10 @@ npm run db:spread-events     # אכיפת אירוע אחד ליום (מזיז �
 - **questions** – **אירוע אחד ליום** (`event_date`). `status`: `open` → `closed` → `resolved`.
   `correct_answer_id` נקבע בהכרעה. אם ליום יש יותר מאירוע אחד — למהמרים מוצג רק הראשון.
 - **answers** – תשובות ברמת השאלה, לכל אחת `value` מספרי.
-- **bet_messages** – מאגר הודעות מצחיקות; בכל הימור מוקפצת אחת אקראית למהמר.
-  מנוהל בטאב "💬 הודעות" בקונסולה (`GET/POST/PATCH/DELETE /api/admin/bet-messages`).
+- **bet_messages** – הודעות מצחיקות; בכל הימור מוקפצת אחת אקראית למהמר (שם המהמר
+  מתווסף אוטומטית, או משולב ב-`{name}`). טאב "💬 הודעות" בקונסולה.
+- **daily_tips** – טיפים מעולם ההימורים; טיפ אקראי מוצג במסך ההימורים בכל טעינה
+  (`GET /api/daily-tip`). טאב "💡 טיפים" בקונסולה.
 - **bets** – **הימור אחד למשתמש ליום** (`UNIQUE(user_id, event_date)`). לחיצה על תשובה
   באירוע אחר של אותו יום מעבירה את ההימור. ניתן להמר **רק על אירועי היום** וכל עוד השאלה
   `open` (נחסם בשרת; ימים אחרים באפליקציה הם צפייה בלבד).
@@ -76,3 +78,5 @@ npm run db:spread-events     # אכיפת אירוע אחד ליום (מזיז �
 | PATCH/DELETE | `/api/admin/answers/:id` | עריכת ערך / מחיקה |
 | GET/POST | `/api/admin/users` | רשימה / יצירת משתמש (`is_admin` לתפקיד) |
 | PATCH/DELETE | `/api/admin/users/:id` | שם / סיסמה / `icon` / תפקיד / מחיקה |
+| GET | `/api/daily-tip` | טיפ יומי אקראי |
+| CRUD | `/api/admin/bet-messages`, `/api/admin/daily-tips` | ניהול מאגרי הטקסט |
