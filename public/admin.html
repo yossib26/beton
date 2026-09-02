@@ -90,7 +90,25 @@
   .toast.err { border-color: var(--bad); color: #fecaca; }
 
   .gate { max-width: 360px; margin: 60px auto; }
-</style>
+
+  /* stats: bettor icon crowd */
+  .stat-faces {
+    display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end;
+    justify-content: center; padding: 12px 4px;
+  }
+  .stat-face { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 76px; }
+  .stat-face .badge {
+    width: var(--sz, 48px); height: var(--sz, 48px); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-2); border: 2px solid var(--line);
+    font-size: calc(var(--sz, 48px) * .5); position: relative;
+  }
+  .stat-face.leader .badge { border-color: var(--gold); }
+  .stat-face .crown { position: absolute; top: -14px; font-size: 15px; }
+  .stat-face .nm { font-size: .72rem; text-align: center; line-height: 1.15; }
+  .stat-face .sc { font-size: .72rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat-face .sc.zero { color: var(--muted); font-weight: 600; }
+</style></style>
 </head>
 <body>
 <header id="hdr" hidden>
@@ -190,8 +208,8 @@ function render() {
   m.innerHTML = '';
   const nav = el('div', { className: 'tabnav' });
   const tabs = [
-    ['events', 'אירועים'], ['bets', '🎟 הימורים'], ['users', 'משתמשים'],
-    ['messages', '💬 הודעות'], ['tips', '💡 טיפים'],
+    ['events', 'אירועים'], ['stats', '📊 סטטיסטיקה'], ['bets', '🎟 הימורים'],
+    ['users', 'משתמשים'], ['messages', '💬 הודעות'], ['tips', '💡 טיפים'],
   ];
   for (const [id, label] of tabs) {
     nav.append(el('button', {
@@ -204,6 +222,7 @@ function render() {
   const body = el('div', { id: 'tabbody' });
   m.append(body);
   if (state.tab === 'events') renderEvents(body);
+  else if (state.tab === 'stats') renderStats(body);
   else if (state.tab === 'bets') renderBets(body);
   else if (state.tab === 'messages') renderTextPool(body, {
     endpoint: 'bet-messages', title: '💬 הודעות אחרי הימור',
@@ -483,6 +502,74 @@ async function renderEvents(root) {
   };
 
   for (const q of questions) root.append(buildCard(q));
+}
+
+// ---------------- stats tab ----------------
+async function renderStats(root) {
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'סטטיסטיקת מהמרים'), el('div', { className: 'center' }, 'טוען…'));
+
+  let data;
+  try { data = await api('/api/admin/stats'); }
+  catch (e) { toast(e.message, true); return; }
+
+  const { range, rows } = data;
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'סטטיסטיקת מהמרים'));
+
+  const dShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
+  root.append(el('p', { className: 'muted', style: 'margin-top:0' },
+    `מיום שישי ${dShort(range.start_date)} עד ${dShort(range.end_date)} · ${rows.length} מהמרים פעילים`));
+
+  const active = rows.filter((r) => r.bets > 0);
+  if (!active.length) {
+    root.append(el('div', { className: 'center' }, 'אין הימורים בטווח הזה'));
+    return;
+  }
+
+  // icon crowd — sized by score rank within the window
+  const maxScore = Math.max(...active.map((r) => r.score), 1);
+  const faces = el('div', { className: 'stat-faces' });
+  active.forEach((r, i) => {
+    const sz = (44 + 30 * (r.score / maxScore)).toFixed(0);
+    const face = el('div', { className: 'stat-face' + (i === 0 && r.score > 0 ? ' leader' : '') },
+      el('div', { className: 'badge', style: `--sz:${sz}px` },
+        i === 0 && r.score > 0 ? el('span', { className: 'crown' }, '👑') : '',
+        r.icon || '🎲'),
+      el('div', { className: 'nm' }, r.name),
+      el('div', { className: 'sc' + (r.score > 0 ? '' : ' zero') }, fmt(r.score) + ' נק\''),
+    );
+    faces.append(face);
+  });
+  root.append(el('div', { className: 'card' }, faces));
+
+  // detail table
+  const tbl = el('table');
+  tbl.append(el('tr', {},
+    el('th', {}, '#'), el('th', {}, 'מהמר'), el('th', {}, 'הימורים'),
+    el('th', {}, 'הוכרעו'), el('th', {}, 'פגיעות'), el('th', {}, 'אחוז הצלחה'),
+    el('th', {}, 'ממתינים'), el('th', {}, 'נקודות'),
+  ));
+  active.forEach((r, i) => {
+    const pct = r.resolved ? Math.round((r.hits / r.resolved) * 100) + '%' : '—';
+    tbl.append(el('tr', {},
+      el('td', { className: 'muted' }, String(i + 1)),
+      el('td', {}, `${r.icon || '🎲'} ${r.name}`),
+      el('td', {}, String(r.bets)),
+      el('td', { className: 'muted' }, String(r.resolved)),
+      el('td', {}, String(r.hits)),
+      el('td', {}, pct),
+      el('td', { className: 'muted' }, String(r.pending)),
+      el('td', { style: 'font-weight:800;font-variant-numeric:tabular-nums' }, fmt(r.score)),
+    ));
+  });
+  root.append(el('div', { className: 'card tbl-scroll' }, tbl));
+
+  const idle = rows.filter((r) => r.bets === 0);
+  if (idle.length) {
+    root.append(el('div', { className: 'card muted' },
+      'לא הימרו בטווח: ' + idle.map((r) => r.name).join(', ')));
+  }
 }
 
 // ---------------- bets tab ----------------

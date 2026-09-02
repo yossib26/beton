@@ -436,6 +436,47 @@ app.get('/api/admin/bets', requireAdmin, wrap(async (_req, res) => {
   res.json(rows);
 }));
 
+// bettor stats for the current betting window: from the most recent Friday
+// strictly before today, through today. On Saturday that Friday is yesterday;
+// on any other day it is the previous week's Friday.
+app.get('/api/admin/stats', requireAdmin, wrap(async (_req, res) => {
+  const { rows } = await pool.query(`
+    WITH win AS (
+      SELECT (CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1)) AS start_date,
+             CURRENT_DATE AS end_date
+    )
+    SELECT u.id, u.name, u.username, u.icon,
+           COUNT(b.id)::int AS bets,
+           COUNT(*) FILTER (
+             WHERE q.status = 'resolved' AND q.correct_answer_id IS NOT NULL
+           )::int AS resolved,
+           COUNT(*) FILTER (
+             WHERE q.status = 'resolved' AND b.answer_id = q.correct_answer_id
+           )::int AS hits,
+           COUNT(*) FILTER (
+             WHERE b.id IS NOT NULL AND (q.status <> 'resolved' OR q.correct_answer_id IS NULL)
+           )::int AS pending,
+           COALESCE(SUM(
+             CASE WHEN q.status = 'resolved' AND b.answer_id = q.correct_answer_id
+                  THEN a.value ELSE 0 END
+           ), 0)::float8 AS score
+      FROM users u
+      LEFT JOIN bets b ON b.user_id = u.id
+        AND b.event_date >= (SELECT start_date FROM win)
+        AND b.event_date <= (SELECT end_date FROM win)
+      LEFT JOIN questions q ON q.id = b.question_id
+      LEFT JOIN answers a ON a.id = b.answer_id
+     WHERE u.is_admin = false AND u.active = true
+     GROUP BY u.id
+     ORDER BY score DESC, hits DESC, u.name ASC
+  `);
+  const range = (await pool.query(`
+    SELECT (CURRENT_DATE - (((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7) + 1))::text AS start_date,
+           CURRENT_DATE::text AS end_date
+  `)).rows[0];
+  res.json({ range, rows });
+}));
+
 app.post('/api/admin/users', requireAdmin, wrap(async (req, res) => {
   const name = (req.body?.name || '').trim();
   const username = (req.body?.username || '').trim();
