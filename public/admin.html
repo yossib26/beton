@@ -325,6 +325,11 @@ async function renderEvents(root) {
   let standings = stats.rows;
   const statsRange = stats.range;
 
+  // per-event bettor list (pick + how many of the 3 changes each has used)
+  await Promise.all(questions.map(async (qq) => {
+    qq._bettors = await api('/api/admin/questions/' + qq.id + '/bets').catch(() => []);
+  }));
+
   root.innerHTML = '';
   root.append(el('h2', {}, 'אירועי ' + heDate(state.date)), dateBar(() => renderEvents(root)));
 
@@ -467,6 +472,42 @@ async function renderEvents(root) {
           } catch (e) { toast(e.message, true); }
         },
       }, '+ הוסף')));
+
+    // bettors on this event — pick + change budget, with an unlock action
+    const bettors = q._bettors || [];
+    if (bettors.length) {
+      card.append(el('hr', { className: 'sep' }));
+      const bWrap = el('div', {});
+      const lockedCount = bettors.filter((b) => b.locked).length;
+      bWrap.append(el('div', { style: 'font-weight:600;margin-bottom:6px' },
+        `מהמרים (${bettors.length})` + (lockedCount ? ` · ${lockedCount} נעולים` : '')));
+      bettors.forEach((bt) => {
+        const badge = el('span', {
+          className: bt.locked ? 'pill closed' : 'muted',
+          style: 'font-size:.72rem;white-space:nowrap',
+        }, `${bt.change_count}/3 שינויים${bt.locked ? ' 🔒' : ''}`);
+        const row = el('div', { className: 'row wrap-row', style: 'padding:4px 0;font-size:.88rem;border-top:1px solid var(--line)' },
+          el('div', { className: 'grow' }, `${bt.icon || '🎲'} ${bt.name}`,
+            el('span', { className: 'muted' }, ` · ${bt.answer_text || '—'}`)),
+          badge,
+        );
+        if (bt.locked) {
+          row.append(el('button', {
+            className: 'btn sm primary', type: 'button',
+            onclick: async () => {
+              try {
+                await api('/api/admin/bets/' + bt.id + '/grant-changes', { method: 'POST' });
+                toast(`${bt.name} — נפתחו 3 שינויים נוספים`);
+                q._bettors = await api('/api/admin/questions/' + q.id + '/bets').catch(() => q._bettors);
+                swap();
+              } catch (e) { toast(e.message, true); }
+            },
+          }, '🔓 פתח ל-3 שינויים'));
+        }
+        bWrap.append(row);
+      });
+      card.append(bWrap);
+    }
 
     card.append(el('hr', { className: 'sep' }));
     const statusSel = el('select', { style: 'width:auto' });

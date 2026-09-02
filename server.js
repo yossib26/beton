@@ -406,6 +406,38 @@ app.delete('/api/admin/questions/:id', requireAdmin, wrap(async (req, res) => {
   res.json({ deleted: r.rowCount });
 }));
 
+// bettors on one event: their pick and how many changes they have used
+app.get('/api/admin/questions/:id/bets', requireAdmin, wrap(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT b.id, u.id AS user_id, u.name, u.icon,
+            b.answer_id, a.text AS answer_text, b.change_count,
+            (b.change_count >= $2) AS locked
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       LEFT JOIN answers a ON a.id = b.answer_id
+      WHERE b.question_id = $1
+      ORDER BY u.name`,
+    [Number(req.params.id), BET_CHANGE_LIMIT]
+  );
+  res.json(rows);
+}));
+
+// grant a bettor BET_CHANGE_LIMIT more changes on this event (unlock)
+app.post('/api/admin/bets/:id/grant-changes', requireAdmin, wrap(async (req, res) => {
+  const { rows } = await pool.query(
+    `UPDATE bets SET change_count = GREATEST(0, change_count - $2), updated_at = now()
+      WHERE id = $1
+      RETURNING id, change_count`,
+    [Number(req.params.id), BET_CHANGE_LIMIT]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'הימור לא נמצא' });
+  res.json({
+    ...rows[0],
+    changes_left: Math.max(0, BET_CHANGE_LIMIT - rows[0].change_count),
+    locked: rows[0].change_count >= BET_CHANGE_LIMIT,
+  });
+}));
+
 app.post('/api/admin/questions/:id/answers', requireAdmin, wrap(async (req, res) => {
   const qid = Number(req.params.id);
   const text = (req.body?.text || '').trim();
