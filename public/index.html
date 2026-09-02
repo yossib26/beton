@@ -29,14 +29,13 @@
   }
   #app {
     width: 100%;
-    max-width: 860px;
+    max-width: 480px;
     min-height: 100vh;
     background: var(--bg);
     display: flex;
     flex-direction: column;
     position: relative;
   }
-  body.auth-mode #app { max-width: 480px; }
   header {
     padding: 14px 16px;
     background: var(--surface);
@@ -57,7 +56,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
-    max-width: 860px;
+    max-width: 480px;
     display: flex;
     background: var(--surface);
     border-top: 1px solid var(--line);
@@ -218,7 +217,7 @@
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
   /* single daily event, comfortably wide and centered */
-  .bet-slot { max-width: 620px; margin: 0 auto; }
+  .bet-slot { margin: 0 auto; }
   .card.bet-here { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
   .tip-card { background: linear-gradient(180deg, rgba(56,189,248,.08), transparent), var(--surface); }
   .tip-card .tip-text { color: var(--text); font-size: .92rem; line-height: 1.5; }
@@ -273,9 +272,8 @@
   }
 
   @media (min-width: 481px) {
-    body { align-items: flex-start; justify-content: center; padding: 20px 0; background: #020617; }
-    #app { border-radius: 22px; min-height: calc(100vh - 40px); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
-    body.auth-mode #app { overflow: hidden; min-height: min(760px, 92vh); }
+    body { align-items: center; padding: 20px 0; background: #020617; }
+    #app { border-radius: 22px; overflow: hidden; min-height: min(860px, 94vh); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
   }
 </style>
 </head>
@@ -581,7 +579,7 @@ function tipCard() {
 
 // the user crowd (same rank-sized icons as the login page)
 function crowdStrip() {
-  const wrap = el('div', { style: 'max-width:720px;margin:16px auto 0' });
+  const wrap = el('div', { style: 'margin:16px auto 0' });
   const faces = el('div', { className: 'faces' });
   wrap.append(faces);
   renderLoginFaces(faces);
