@@ -315,13 +315,15 @@ async function renderEvents(root) {
   root.innerHTML = '';
   root.append(el('h2', {}, 'ניהול אירועים'), dateBar(() => renderEvents(root)), el('div', { className: 'center' }, 'טוען…'));
 
-  let questions, standings;
+  let questions, stats;
   try {
-    [questions, standings] = await Promise.all([
+    [questions, stats] = await Promise.all([
       api('/api/admin/questions?date=' + state.date),
-      api('/api/leaderboard').catch(() => []),
+      api('/api/admin/stats').catch(() => ({ rows: [], range: null })),
     ]);
   } catch (e) { toast(e.message, true); return; }
+  let standings = stats.rows;
+  const statsRange = stats.range;
 
   root.innerHTML = '';
   root.append(el('h2', {}, 'אירועי ' + heDate(state.date)), dateBar(() => renderEvents(root)));
@@ -337,7 +339,8 @@ async function renderEvents(root) {
       `⚠ ${questions.length} אירועים ביום הזה — למהמרים מוצג רק הראשון. הרץ \`npm run db:spread-events\` או שנה תאריכים.`));
   }
 
-  // live standings — recomputed from every resolved event; refreshed in place
+  // live standings for the current betting window (previous week's Friday
+  // through today) — recomputed from every resolved event, refreshed in place
   const standBody = el('div', {});
   const paintStandings = () => {
     standBody.innerHTML = '';
@@ -353,11 +356,13 @@ async function renderEvents(root) {
   };
   paintStandings();
   const refreshStandings = async () => {
-    try { standings = await api('/api/leaderboard'); paintStandings(); } catch { /* keep last */ }
+    try { standings = (await api('/api/admin/stats')).rows; paintStandings(); } catch { /* keep last */ }
   };
+  const dm = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
+  const rangeLabel = statsRange ? ` · ${dm(statsRange.start_date)}–${dm(statsRange.end_date)}` : '';
   root.append(el('div', { className: 'card' },
     el('div', { className: 'row', style: 'font-weight:700;margin-bottom:6px' },
-      el('div', { className: 'grow' }, '🏆 דירוג מעודכן'),
+      el('div', { className: 'grow' }, '🏆 דירוג מעודכן' + rangeLabel),
       el('button', { className: 'btn ghost sm', type: 'button', onclick: refreshStandings }, '⟳ חשב מחדש'),
     ),
     standBody,
