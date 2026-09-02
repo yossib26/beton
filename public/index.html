@@ -201,12 +201,8 @@
 
   .center { text-align: center; padding: 40px 10px; color: var(--muted); }
 
-  /* wide layout: events flow into columns as the page gets wider */
-  .cards-grid {
-    display: grid; gap: 12px;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    align-items: start;
-  }
+  /* single daily event, comfortably wide and centered */
+  .bet-slot { max-width: 620px; margin: 0 auto; }
   .card.bet-here { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 
   /* login: fill exactly one screen, no scroll */
@@ -465,34 +461,21 @@ async function renderBets() {
   }
 
   if (!questions.length) {
-    view.append(el('div', { className: 'center' }, 'אין אירועים ליום הזה 🤷'), logoutFooter());
+    view.append(el('div', { className: 'center' }, 'אין אירוע ליום הזה 🤷'), logoutFooter());
     return;
   }
 
+  // one event per day: prefer the one holding the bet, else the first
+  const betQid = questions[0].my_bet_question_id;
+  const q = questions.find((x) => x.id === betQid) || questions[0];
+
   const showResults = !isToday; // today: show only the chosen bet, never results
-  if (isToday) {
-    view.append(el('div', { className: 'card muted' },
-      '🎯 הימור אחד ליום — בחר תשובה באחד מאירועי היום. לחיצה על אירוע אחר תעביר את ההימור.'));
-  }
-
-  const grid = el('div', { className: 'cards-grid' });
-  view.append(grid, logoutFooter());
-
-  const dayBetQid = () => {
-    const q = questions.find((x) => x.my_bet_question_id != null);
-    return q ? q.my_bet_question_id : null;
-  };
+  const slot = el('div', { className: 'bet-slot' });
+  view.append(slot, logoutFooter());
 
   const paint = () => {
-    grid.innerHTML = '';
-    for (const q of questions) grid.append(buildCard(q));
-  };
-
-  const buildCard = (q) => {
-    const betQid = dayBetQid();
-    const betHere = betQid === q.id;
-    const betElsewhere = betQid != null && !betHere;
-
+    slot.innerHTML = '';
+    const betHere = q.my_answer_id != null;
     const card = el('div', { className: 'card' + (betHere ? ' bet-here' : '') });
     card.append(el('div', { className: 'row' },
       el('div', { className: 'grow', style: 'font-weight:600' }, q.text),
@@ -501,7 +484,7 @@ async function renderBets() {
 
     const box = el('div', { className: 'answers' });
     for (const a of q.answers) {
-      const picked = betHere && q.my_answer_id === a.id;
+      const picked = q.my_answer_id === a.id;
       const isCorrect = showResults && q.status === 'resolved' && q.correct_answer_id === a.id;
       const wrongPick = showResults && q.status === 'resolved' && picked && !isCorrect;
       const btn = el('button', {
@@ -514,21 +497,14 @@ async function renderBets() {
       if (q.status === 'open' && isToday) {
         btn.onclick = async () => {
           if (picked) return;
-          const snapshot = questions.map((x) => ({ id: x.id, m: x.my_answer_id, b: x.my_bet_question_id }));
-          // optimistic: move the single daily bet here
-          questions.forEach((x) => {
-            x.my_bet_question_id = q.id;
-            x.my_answer_id = x.id === q.id ? a.id : null;
-          });
+          const prev = q.my_answer_id;
+          q.my_answer_id = a.id; // optimistic
           paint();
           try {
             await api('/api/bets', { method: 'POST', body: { question_id: q.id, answer_id: a.id } });
             toast('ההימור נשמר');
           } catch (e) {
-            snapshot.forEach((s) => {
-              const x = questions.find((y) => y.id === s.id);
-              x.my_answer_id = s.m; x.my_bet_question_id = s.b;
-            });
+            q.my_answer_id = prev;
             paint();
             toast(e.message, true);
           }
@@ -544,13 +520,11 @@ async function renderBets() {
       card.append(el('div', { className: 'muted', style: 'margin-top:8px' },
         hit ? `פגעת! ${fmt(gained)} נקודות` : 'החמצת בשאלה הזו'));
     } else if (betHere) {
-      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך כאן ✓'));
-    } else if (betElsewhere && isToday) {
-      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך על אירוע אחר — לחיצה תעביר לכאן'));
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'ההימור היומי שלך ✓'));
     } else if (!isToday) {
-      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת על האירוע הזה'));
+      card.append(el('div', { className: 'muted', style: 'margin-top:8px' }, 'לא הימרת ביום הזה'));
     }
-    return card;
+    slot.append(card);
   };
 
   paint();
@@ -570,7 +544,8 @@ async function renderBoard() {
   catch (e) { toast(e.message, true); return; }
 
   view.innerHTML = '';
-  view.append(el('h2', {}, 'טבלת דירוג 🏆'));
+  const wrap = el('div', { className: 'bet-slot' });
+  wrap.append(el('h2', {}, 'טבלת דירוג 🏆'));
   const card = el('div', { className: 'card' });
   rows.forEach((r, i) => {
     card.append(el('div', { className: 'lb-row' + (r.id === state.user.id ? ' me' : '') },
@@ -582,8 +557,9 @@ async function renderBoard() {
       el('div', { className: 'lb-score' }, fmt(r.score)),
     ));
   });
-  view.append(card);
-  view.append(el('p', { className: 'muted', style: 'text-align:center' }, 'הניקוד = סכום הערכים של התשובות הנכונות שבחרת'));
+  wrap.append(card);
+  wrap.append(el('p', { className: 'muted', style: 'text-align:center' }, 'הניקוד = סכום הערכים של התשובות הנכונות שבחרת'));
+  view.append(wrap);
 }
 
 

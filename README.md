@@ -26,8 +26,9 @@ npm start                 # http://127.0.0.1:8000
 נתוני דמו (אופציונלי):
 
 ```bash
-npm run db:seed-demo        # 3 שאלות/יום, 10 ימים קדימה, פתוחות
-npm run db:seed-demo-past   # 2 שאלות/יום, 10 ימים אחורה, מוכרעות + ~30 הימורי דמו למהמרים
+npm run db:seed-demo        # אירוע אחד/יום, 14 ימים קדימה, פתוח
+npm run db:seed-demo-past    # אירוע אחד/יום, 14 ימים אחורה, מוכרע + הימורי דמו למהמרים
+npm run db:spread-events     # אכיפת אירוע אחד ליום (מזיז אירועים עודפים קדימה)
 ```
 
 ## פריסה ב-Vercel
@@ -47,8 +48,8 @@ npm run db:seed-demo-past   # 2 שאלות/יום, 10 ימים אחורה, מו�
 - **users** – `is_admin=false` מהמרים, `is_admin=true` חשבונות ניהול (לא משתתפים בהימורים
   ולא בטבלת הדירוג). כניסה עם `username` + `password` (scrypt). `icon` – אימוג'י שנבחר
   בקונסולת הניהול ומוצג במסך הכניסה (ברירת מחדל: אייקון אקראי לפי id).
-- **questions** – אירוע ליום (`event_date`). `status`: `open` → `closed` → `resolved`.
-  `correct_answer_id` נקבע בהכרעה.
+- **questions** – **אירוע אחד ליום** (`event_date`). `status`: `open` → `closed` → `resolved`.
+  `correct_answer_id` נקבע בהכרעה. אם ליום יש יותר מאירוע אחד — למהמרים מוצג רק הראשון.
 - **answers** – תשובות ברמת השאלה, לכל אחת `value` מספרי.
 - **bets** – **הימור אחד למשתמש ליום** (`UNIQUE(user_id, event_date)`). לחיצה על תשובה
   באירוע אחר של אותו יום מעבירה את ההימור. ניתן להמר **רק על אירועי היום** וכל עוד השאלה

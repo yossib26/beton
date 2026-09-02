@@ -246,6 +246,10 @@ async function renderEvents(root) {
       '📅 יום שעבר — אפשר להכריע ולערוך אירועים קיימים, אך לא להוסיף אירוע חדש. ' +
       'הוספת אירוע אפשרית להיום או לימים קדימה בלבד.'));
   }
+  if (questions.length > 1) {
+    root.append(el('div', { className: 'card', style: 'color:var(--bad)' },
+      `⚠ ${questions.length} אירועים ביום הזה — למהמרים מוצג רק הראשון. הרץ \`npm run db:spread-events\` או שנה תאריכים.`));
+  }
 
   // live standings — recomputed from every resolved event; refreshed in place
   const standBody = el('div', {});

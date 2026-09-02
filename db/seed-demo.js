@@ -1,9 +1,9 @@
-// Seed demo questions. Demo texts are prefixed with "[דמו] " so a re-run
-// replaces only the demo rows in the same time window (future or past).
+// Seed demo questions — one event per day. Demo texts are prefixed with
+// "[דמו] " so a re-run replaces only the demo rows in the same window.
 //
-//   node db/seed-demo.js                 -> 10 days forward, 3/day (30), status open
-//   node db/seed-demo.js --past          -> 10 days back,    2/day (20), status resolved
-//   node db/seed-demo.js --days 5 --per-day 2 --past
+//   node db/seed-demo.js                 -> 14 days forward, 1/day, status open
+//   node db/seed-demo.js --past          -> 14 days back,    1/day, status resolved
+//   node db/seed-demo.js --days 5 --per-day 1 --past
 import { pool } from './pool.js';
 
 const args = process.argv.slice(2);
@@ -13,8 +13,8 @@ const argVal = (name, def) => {
   return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def;
 };
 
-const DAYS = argVal('days', 10);
-const PER_DAY = argVal('per-day', past ? 2 : 3);
+const DAYS = argVal('days', 14);
+const PER_DAY = argVal('per-day', 1);
 const PREFIX = '[דמו] ';
 
 const TEAMS = [

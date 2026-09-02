@@ -7,7 +7,8 @@
     "start": "node server.js",
     "db:init": "node db/init.js",
     "db:seed-demo": "node db/seed-demo.js",
-    "db:seed-demo-past": "node db/seed-demo.js --past"
+    "db:seed-demo-past": "node db/seed-demo.js --past",
+    "db:spread-events": "node db/spread-events.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
