@@ -412,6 +412,27 @@ app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
   res.json(rows);
 }));
 
+// every bet, per bettor — which event, what they picked, how it turned out
+app.get('/api/admin/bets', requireAdmin, wrap(async (_req, res) => {
+  const { rows } = await pool.query(`
+    SELECT b.id, b.event_date, b.created_at,
+           u.id AS user_id, u.name AS user_name, u.username, u.icon,
+           q.id AS question_id, q.text AS question_text, q.status,
+           a.text AS answer_text, a.value::float8 AS value,
+           ca.text AS correct_answer_text,
+           (q.status = 'resolved' AND q.correct_answer_id IS NOT NULL) AS resolved,
+           (q.status = 'resolved' AND b.answer_id = q.correct_answer_id) AS is_hit
+      FROM bets b
+      JOIN users u ON u.id = b.user_id
+      JOIN questions q ON q.id = b.question_id
+      JOIN answers a ON a.id = b.answer_id
+      LEFT JOIN answers ca ON ca.id = q.correct_answer_id
+     WHERE u.is_admin = false
+     ORDER BY u.name, b.event_date DESC NULLS LAST, q.position, q.id
+  `);
+  res.json(rows);
+}));
+
 app.post('/api/admin/users', requireAdmin, wrap(async (req, res) => {
   const name = (req.body?.name || '').trim();
   const username = (req.body?.username || '').trim();

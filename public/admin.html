@@ -190,7 +190,7 @@ function render() {
   m.innerHTML = '';
   const nav = el('div', { className: 'tabnav' });
   const tabs = [
-    ['events', 'אירועים'], ['users', 'משתמשים'],
+    ['events', 'אירועים'], ['bets', '🎟 הימורים'], ['users', 'משתמשים'],
     ['messages', '💬 הודעות'], ['tips', '💡 טיפים'],
   ];
   for (const [id, label] of tabs) {
@@ -204,6 +204,7 @@ function render() {
   const body = el('div', { id: 'tabbody' });
   m.append(body);
   if (state.tab === 'events') renderEvents(body);
+  else if (state.tab === 'bets') renderBets(body);
   else if (state.tab === 'messages') renderTextPool(body, {
     endpoint: 'bet-messages', title: '💬 הודעות אחרי הימור',
     hint: 'בכל הימור מוקפצת למהמר הודעה אקראית. שם המהמר מתווסף בהתחלה; אפשר גם לשלב {name} בתוך הטקסט.',
@@ -482,6 +483,71 @@ async function renderEvents(root) {
   };
 
   for (const q of questions) root.append(buildCard(q));
+}
+
+// ---------------- bets tab ----------------
+async function renderBets(root) {
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'הימורים לפי מהמר'), el('div', { className: 'center' }, 'טוען…'));
+
+  let rows;
+  try { rows = await api('/api/admin/bets'); }
+  catch (e) { toast(e.message, true); return; }
+
+  root.innerHTML = '';
+  root.append(el('h2', {}, 'הימורים לפי מהמר'));
+
+  if (!rows.length) {
+    root.append(el('div', { className: 'center' }, 'אין הימורים עדיין'));
+    return;
+  }
+
+  // group bets by bettor, preserving the server's name order
+  const groups = [];
+  const byId = new Map();
+  for (const b of rows) {
+    let g = byId.get(b.user_id);
+    if (!g) { g = { user_id: b.user_id, name: b.user_name, username: b.username, icon: b.icon, bets: [] }; byId.set(b.user_id, g); groups.push(g); }
+    g.bets.push(b);
+  }
+
+  root.append(el('p', { className: 'muted', style: 'margin-top:0' },
+    `${groups.length} מהמרים · ${rows.length} הימורים סה"כ`));
+
+  for (const g of groups) {
+    const hits = g.bets.filter((b) => b.is_hit).length;
+    const resolved = g.bets.filter((b) => b.resolved).length;
+    const score = g.bets.reduce((s, b) => s + (b.is_hit ? b.value : 0), 0);
+
+    const tbl = el('table');
+    tbl.append(el('tr', {},
+      el('th', {}, 'תאריך'), el('th', {}, 'שאלה'),
+      el('th', {}, 'ההימור'), el('th', {}, 'ערך'), el('th', {}, 'תוצאה'),
+    ));
+    for (const b of g.bets) {
+      let outcome, cls = 'muted';
+      if (!b.resolved) { outcome = b.status === 'open' ? 'ממתין' : 'טרם הוכרע'; }
+      else if (b.is_hit) { outcome = '✓ פגע'; cls = ''; }
+      else { outcome = '✗ החמיץ' + (b.correct_answer_text ? ` (${b.correct_answer_text})` : ''); }
+      tbl.append(el('tr', {},
+        el('td', { className: 'muted', style: 'white-space:nowrap' }, b.event_date ? heDate(b.event_date) : '—'),
+        el('td', {}, b.question_text),
+        el('td', { style: 'font-weight:600' }, b.answer_text),
+        el('td', { className: 'muted', style: 'font-variant-numeric:tabular-nums' }, fmt(b.value)),
+        el('td', { className: cls, style: b.resolved && b.is_hit ? 'color:var(--good)' : (b.resolved ? 'color:var(--bad)' : '') }, outcome),
+      ));
+    }
+
+    root.append(el('div', { className: 'card' },
+      el('div', { className: 'row', style: 'font-weight:700;margin-bottom:4px' },
+        el('div', { className: 'grow' }, `${g.icon || '🎲'} ${g.name}`),
+        el('div', { className: 'muted', style: 'font-size:.8rem' },
+          `${g.bets.length} הימורים · ${hits}/${resolved} פגיעות`),
+        el('div', { style: 'font-weight:800;font-variant-numeric:tabular-nums;width:52px;text-align:left' }, fmt(score)),
+      ),
+      el('div', { className: 'tbl-scroll' }, tbl),
+    ));
+  }
 }
 
 // ---------------- users tab ----------------
